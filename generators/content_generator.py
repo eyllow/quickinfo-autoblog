@@ -58,6 +58,7 @@ class ContentGenerator:
         self.categories_config = self._load_json("categories.json")
         self.official_links = self._load_json("official_links.json")
         self.coupang_links = self._load_json("coupang_links.json")
+        self.coupang_defaults = self._load_json("coupang_defaults.json")
 
     def _load_json(self, filename: str) -> dict:
         """JSON 설정 파일 로드"""
@@ -258,14 +259,21 @@ class ContentGenerator:
         content = content.replace("[DISCLAIMER]", HEALTH_DISCLAIMER)
         return content
 
-    def insert_affiliate_notice(self, content: str) -> str:
-        """[AFFILIATE_NOTICE] 태그를 파트너스 문구로 교체 (중복 방지)"""
+    def insert_affiliate_notice(self, content: str, has_coupang: bool = False) -> str:
+        """
+        [AFFILIATE_NOTICE] 태그를 파트너스 문구로 교체
+
+        핵심 로직: 쿠팡 배너가 있을 때만 파트너스 문구 삽입
+        """
         # 태그 제거
         content = content.replace("[AFFILIATE_NOTICE]", "")
 
-        # 이미 파트너스 문구가 있으면 추가하지 않음
-        if "쿠팡 파트너스 활동" not in content:
+        # 쿠팡 배너가 있고, 아직 문구가 없을 때만 추가
+        if has_coupang and "쿠팡 파트너스 활동" not in content:
             content += AFFILIATE_NOTICE
+            logger.info("Affiliate notice inserted (coupang exists)")
+        elif not has_coupang:
+            logger.info("Affiliate notice skipped (no coupang)")
 
         return content
 
@@ -290,18 +298,21 @@ class ContentGenerator:
         self,
         content: str,
         keyword: str,
-        category_config: dict
+        category_config: dict,
+        category_name: str = ""
     ) -> tuple[str, bool]:
         """
         [COUPANG] 태그를 쿠팡 상품으로 교체
 
         1순위: 구글 시트 상품 DB에서 매칭
-        2순위: JSON 기반 쿠팡 링크
+        2순위: JSON 기반 쿠팡 링크 (키워드 매칭)
+        3순위: 카테고리별 기본 링크 (coupang_defaults.json)
 
         Args:
             content: HTML 본문
             keyword: 키워드
             category_config: 카테고리 설정
+            category_name: 카테고리 이름 (기본 링크 조회용)
 
         Returns:
             (수정된 콘텐츠, 쿠팡 삽입 여부) 튜플
@@ -329,19 +340,31 @@ class ContentGenerator:
         except Exception as e:
             logger.warning(f"Google Sheets product fetch failed: {e}")
 
-        # 2순위: JSON 기반 쿠팡 링크
+        # 2순위: JSON 기반 쿠팡 링크 (키워드 매칭)
         coupang = self.get_coupang_link(keyword)
         if coupang:
             button_html = COUPANG_BUTTON_TEMPLATE.format(
                 url=coupang["url"],
                 button_text=coupang["button_text"]
             )
-            content = content.replace("[COUPANG]", button_html + COUPANG_DISCLAIMER)
+            content = content.replace("[COUPANG]", button_html)
             logger.info(f"Coupang button inserted: {coupang['button_text']}")
             return content, True
 
-        # 매칭 없음
+        # 3순위: 카테고리별 기본 링크
+        default_link = self.coupang_defaults.get(category_name)
+        if default_link:
+            button_html = COUPANG_BUTTON_TEMPLATE.format(
+                url=default_link["url"],
+                button_text=default_link["text"]
+            )
+            content = content.replace("[COUPANG]", button_html)
+            logger.info(f"Coupang default button inserted: {default_link['text']}")
+            return content, True
+
+        # 매칭 없음 - 쿠팡 링크 없으면 배너도 없음
         content = content.replace("[COUPANG]", "")
+        logger.info("No coupang link found - tag removed")
         return content, False
 
     def clean_meta_tags(self, content: str) -> str:
@@ -417,10 +440,12 @@ class ContentGenerator:
 
         # 8. 쿠팡 상품 삽입
         logger.info("Step 7: Inserting coupang products...")
-        content, has_coupang = self.insert_coupang_products(content, keyword, category_config)
+        content, has_coupang = self.insert_coupang_products(
+            content, keyword, category_config, category_name
+        )
 
-        # 9. 파트너스 문구 삽입 (중복 방지)
-        content = self.insert_affiliate_notice(content)
+        # 9. 파트너스 문구 삽입 (쿠팡 배너가 있을 때만)
+        content = self.insert_affiliate_notice(content, has_coupang)
 
         # 10. 카테고리 뱃지 삽입
         logger.info("Step 8: Inserting category badge...")

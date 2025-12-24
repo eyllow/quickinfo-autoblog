@@ -6,11 +6,12 @@
 
 COMMON_STYLE = """
 [글 길이 규칙 - 매우 중요!]
-* 최소 2,500자 이상 작성 (필수)
-* 각 섹션을 자세하게 작성
+* 최소 3,000자 이상 작성 (필수)
+* 각 소제목 섹션마다 최소 3~4개 문단 작성
 * 각 장점/단점 항목에 구체적인 설명 2~3줄 추가
 * "왜 이게 장점인지", "어떤 상황에서 단점인지" 상세히 설명
 * FAQ 섹션 반드시 3개 이상 포함
+* 마무리 섹션에 "마지막으로 한 가지 더 말씀드릴게요" 추가 단락 필수
 
 [공통 작성 규칙]
 1. 문장은 1~2줄로 짧게 끊어서 작성
@@ -20,28 +21,46 @@ COMMON_STYLE = """
 5. 이모지 적절히 사용 (섹션당 1~2개)
 6. "~입니다/~합니다" 대신 "~예요/~해요" 사용 (친근한 해요체)
 
-[HTML 형식 - 세련된 스타일]
+[폰트 스타일 규칙 - 반드시 준수]
+| 요소 | 크기 | 두께 | 색상 | 특징 |
+|------|------|------|------|------|
+| 대제목 | 26px | Bold (700) | #222 | 중앙정렬 |
+| 중간제목 | 22px | SemiBold (600) | #333 | 중앙정렬 |
+| 소제목 | 20px | SemiBold (600) | #333 | 세로바 3px |
+| 본문 | 16px | Regular (400) | #444 | line-height 2.0 |
+| 표 헤더 | 15px | SemiBold (600) | #333 | 배경 #f8f9fa |
+| 표 내용 | 15px | Regular (400) | #555 | - |
+| 사진캡션 | 13px | Regular (400) | #888 | 중앙정렬 |
+| 강조 | 16px | SemiBold (600) | #2e8b57 | 초록색 |
+| 따옴표 | 18px | Medium (500) | #2e8b57 | 배경박스 |
+
+[HTML 형식 - 통일된 스타일]
 - 전체를 <div style="text-align: center; line-height: 2.0;">로 감싸기
 
-- 메인 제목 (H2 스타일):
-<h2 style="font-size: 24px; font-weight: 600; color: #333; margin-bottom: 30px; line-height: 1.4;">
-  제목 내용
+- 대제목 (글 시작):
+<h2 style="font-size: 26px; font-weight: 700; color: #222; margin: 0 0 25px 0; line-height: 1.4; text-align: center;">
+  대제목 내용
 </h2>
 
+- 중간제목:
+<h3 style="font-size: 22px; font-weight: 600; color: #333; margin: 35px 0 20px 0; line-height: 1.4; text-align: center;">
+  중간제목 내용
+</h3>
+
 - 소제목 (세로바 스타일):
-<div style="border-left: 3px solid #333; padding-left: 12px; margin: 35px 0 20px 0; text-align: left;">
-  <h3 style="font-size: 18px; font-weight: 600; color: #333; margin: 0;">
+<div style="border-left: 3px solid #333; padding-left: 12px; margin: 30px 0 15px 0; text-align: left;">
+  <h4 style="font-size: 20px; font-weight: 600; color: #333; margin: 0;">
     소제목 내용
-  </h3>
+  </h4>
 </div>
 
 - 본문 텍스트:
-<p style="font-size: 16px; line-height: 1.9; color: #444; margin: 12px 0;">
+<p style="font-size: 16px; line-height: 2.0; color: #444; margin: 12px 0;">
   본문 내용
 </p>
 
 - 강조 따옴표:
-<div style="margin: 30px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; font-size: 17px; color: #2e8b57;">
+<div style="margin: 30px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; font-size: 18px; font-weight: 500; color: #2e8b57; text-align: center;">
   ❝ 강조하고 싶은 내용 ❞
 </div>
 
@@ -60,6 +79,11 @@ COMMON_STYLE = """
     </tr>
   </tbody>
 </table>
+
+- 사진 캡션:
+<p style="font-size: 13px; color: #888; margin: 8px 0 25px 0; text-align: center;">
+  캡션 내용
+</p>
 
 [이미지 태그 - 반드시 포함]
 - [IMAGE_1], [IMAGE_2], [IMAGE_3], [IMAGE_4] 태그를 본문에 배치
@@ -607,7 +631,7 @@ AFFILIATE_NOTICE = '''
 
 # 카테고리 뱃지 템플릿
 CATEGORY_BADGE_TEMPLATE = '''
-<div style="margin-bottom: 20px;">
+<div style="text-align: center; margin-bottom: 20px;">
   <span style="background: #e8f4f8; color: #1a73e8; padding: 5px 12px;
                border-radius: 15px; font-size: 13px; font-weight: 500;">
     {category}
