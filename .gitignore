@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.sqlite3
+
+# Secrets - 절대 커밋하지 않음
+.env
+config/google_credentials.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Cache
+.cache/

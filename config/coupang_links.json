@@ -1,0 +1,52 @@
+{
+  "스마트폰": {
+    "keywords": ["아이폰", "갤럭시", "스마트폰", "핸드폰", "휴대폰", "폴드", "플립"],
+    "url": "https://link.coupang.com/a/cvQKZQ",
+    "button_text": "최신 스마트폰 최저가 확인"
+  },
+  "노트북": {
+    "keywords": ["노트북", "맥북", "그램", "갤럭시북", "레노버", "델", "HP"],
+    "url": "https://link.coupang.com/a/cvQKZQ",
+    "button_text": "노트북 최저가 비교"
+  },
+  "태블릿": {
+    "keywords": ["아이패드", "태블릿", "갤럭시탭"],
+    "url": "https://link.coupang.com/a/cvQKZQ",
+    "button_text": "태블릿 특가 확인"
+  },
+  "가전": {
+    "keywords": ["TV", "냉장고", "세탁기", "에어컨", "청소기", "공기청정기", "제습기"],
+    "url": "https://link.coupang.com/a/cvQKZQ",
+    "button_text": "가전제품 특가 확인"
+  },
+  "음향": {
+    "keywords": ["에어팟", "이어폰", "헤드폰", "스피커", "버즈"],
+    "url": "https://link.coupang.com/a/cvQKZQ",
+    "button_text": "음향기기 베스트셀러"
+  },
+  "건강": {
+    "keywords": ["다이어트", "영양제", "비타민", "운동", "헬스", "프로틴"],
+    "url": "https://link.coupang.com/a/cvQKZQ",
+    "button_text": "건강식품 베스트셀러"
+  },
+  "뷰티": {
+    "keywords": ["화장품", "스킨케어", "선크림", "마스크팩"],
+    "url": "https://link.coupang.com/a/cvQKZQ",
+    "button_text": "뷰티 인기상품"
+  },
+  "육아": {
+    "keywords": ["육아", "출산", "아기", "유아", "기저귀", "분유"],
+    "url": "https://link.coupang.com/a/cvQKZQ",
+    "button_text": "육아용품 특가"
+  },
+  "주방": {
+    "keywords": ["에어프라이어", "전자레인지", "밥솥", "커피머신", "믹서기"],
+    "url": "https://link.coupang.com/a/cvQKZQ",
+    "button_text": "주방가전 인기상품"
+  },
+  "캠핑": {
+    "keywords": ["캠핑", "텐트", "아웃도어", "등산"],
+    "url": "https://link.coupang.com/a/cvQKZQ",
+    "button_text": "캠핑용품 특가"
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "categories": {
+    "재테크": {
+      "keywords": ["연말정산", "청약", "대출", "적금", "주식", "부동산", "세금", "환급", "금리", "ETF", "펀드", "전세", "월세", "신용점수", "연금", "보험", "청년도약", "ISA", "배당", "투자"],
+      "template": "finance",
+      "image_style": "ai_office",
+      "requires_table": true,
+      "requires_official_link": true,
+      "requires_coupang": false,
+      "priority": 1
+    },
+    "IT테크": {
+      "keywords": ["아이폰", "갤럭시", "노트북", "맥북", "AI", "앱", "스마트폰", "챗GPT", "애플", "삼성", "구글", "테슬라", "전기차", "5G", "메타버스", "블록체인", "비트코인", "코딩", "프로그래밍"],
+      "template": "product",
+      "image_style": "ai_tech",
+      "requires_table": true,
+      "requires_official_link": false,
+      "requires_coupang": true,
+      "priority": 1
+    },
+    "연예": {
+      "keywords": ["BTS", "아이돌", "드라마", "배우", "가수", "연예인", "콘서트", "블랙핑크", "트와이스", "뉴진스", "넷플릭스", "디즈니", "예능", "웹툰"],
+      "template": "celebrity",
+      "image_style": "ai_stage",
+      "requires_table": false,
+      "requires_official_link": false,
+      "requires_coupang": false,
+      "warning": "실제 인물 사진 사용 금지",
+      "priority": 2
+    },
+    "건강": {
+      "keywords": ["다이어트", "운동", "영양제", "건강", "피부", "수면", "헬스", "비타민", "건강검진", "병원", "의료", "독감", "백신", "스트레스", "정신건강", "탈모"],
+      "template": "health",
+      "image_style": "ai_health",
+      "requires_table": true,
+      "requires_official_link": false,
+      "requires_coupang": true,
+      "requires_disclaimer": true,
+      "priority": 2
+    },
+    "생활정보": {
+      "keywords": ["청소", "정리", "요리", "레시피", "꿀팁", "생활", "맛집", "여행", "호텔", "항공", "카페", "인테리어", "이사", "결혼", "육아", "반려동물", "자동차", "운전면허"],
+      "template": "lifestyle",
+      "image_style": "ai_home",
+      "requires_table": false,
+      "requires_official_link": false,
+      "requires_coupang": true,
+      "priority": 3
+    },
+    "취업교육": {
+      "keywords": ["취업", "이직", "면접", "자격증", "공무원", "토익", "영어", "대학", "수능", "입시", "학원", "온라인강의", "자기소개서"],
+      "template": "education",
+      "image_style": "ai_office",
+      "requires_table": true,
+      "requires_official_link": true,
+      "requires_coupang": false,
+      "priority": 2
+    },
+    "트렌드": {
+      "keywords": [],
+      "template": "trend",
+      "image_style": "ai_general",
+      "requires_table": false,
+      "requires_official_link": false,
+      "requires_coupang": false,
+      "is_default": true,
+      "priority": 99
+    }
+  },
+  "image_styles": {
+    "ai_office": ["office work documents", "business meeting", "computer desk work", "paperwork office", "professional workspace"],
+    "ai_tech": ["smartphone technology", "laptop computer", "modern gadget", "electronics device", "tech innovation"],
+    "ai_stage": ["concert stage lights", "music performance", "spotlight stage", "microphone stand", "audience concert"],
+    "ai_health": ["fitness exercise", "healthy lifestyle", "yoga meditation", "nutrition food", "wellness routine"],
+    "ai_home": ["home interior design", "kitchen cooking", "living room cozy", "cleaning organization", "modern apartment"],
+    "ai_general": ["people lifestyle", "modern urban life", "success growth", "trending popular", "contemporary style"]
+  }
+}
