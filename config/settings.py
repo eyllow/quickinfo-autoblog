@@ -37,7 +37,9 @@ class Settings:
         self.coupang_partner_id = os.getenv("COUPANG_PARTNER_ID", "")
 
         # 디렉토리 설정
+        self.project_root = BASE_DIR
         self.logs_dir = BASE_DIR / "logs"
+        self.log_path = self.logs_dir / "autoblog.log"
         self.db_path = BASE_DIR / "published_posts.db"
 
         # 로그 디렉토리 생성
