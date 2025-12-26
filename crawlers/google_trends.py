@@ -4,6 +4,7 @@ Google Trends 키워드 수집 모듈
 """
 import logging
 import feedparser
+import requests
 from typing import List, Optional
 from datetime import datetime
 
@@ -15,8 +16,13 @@ from config.categories import get_category_for_keyword
 
 logger = logging.getLogger(__name__)
 
-# Google Trends RSS 피드 URL (한국)
-TRENDS_RSS_URL = "https://trends.google.com/trends/trendingsearches/daily/rss?geo=KR"
+# Google Trends RSS 피드 URL (한국) - 2024년 이후 새 URL
+TRENDS_RSS_URL = "https://trends.google.com/trending/rss?geo=KR"
+
+# User-Agent 헤더 (Google 차단 방지)
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
 
 
 class GoogleTrendsCrawler:
@@ -38,7 +44,12 @@ class GoogleTrendsCrawler:
         """
         try:
             logger.info(f"Google Trends RSS 피드 요청: {self.rss_url}")
-            feed = feedparser.parse(self.rss_url)
+
+            # requests로 먼저 가져온 후 feedparser에 전달 (User-Agent 필요)
+            response = requests.get(self.rss_url, headers=HEADERS, timeout=15)
+            response.raise_for_status()
+
+            feed = feedparser.parse(response.text)
 
             if not feed.entries:
                 logger.warning("트렌드 키워드를 찾을 수 없습니다.")
@@ -66,6 +77,9 @@ class GoogleTrendsCrawler:
             logger.info(f"총 {len(keywords)}개 트렌드 키워드 수집 완료")
             return keywords
 
+        except requests.RequestException as e:
+            logger.error(f"RSS 피드 요청 실패: {e}")
+            return []
         except Exception as e:
             logger.error(f"트렌드 키워드 수집 실패: {e}")
             return []
@@ -122,11 +136,58 @@ def get_trending_keyword(exclude_keywords: List[str] = None) -> Optional[dict]:
     return crawler.get_best_keyword(exclude_keywords)
 
 
+def test_google_trends():
+    """
+    테스트 함수 - RSS 피드 구조 확인 및 키워드 파싱 테스트
+    """
+    import requests
+
+    url = TRENDS_RSS_URL
+
+    print("=" * 50)
+    print("Google Trends RSS 피드 테스트")
+    print("=" * 50)
+    print(f"\nURL: {url}\n")
+
+    # 1. HTTP 요청 테스트
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=15)
+        print(f"HTTP 상태: {response.status_code}")
+        print(f"Content-Type: {response.headers.get('content-type', 'N/A')}")
+    except Exception as e:
+        print(f"HTTP 요청 실패: {e}")
+        return None
+
+    # 2. feedparser 파싱 테스트
+    feed = feedparser.parse(response.text)
+    print(f"\n피드 제목: {feed.feed.get('title', 'N/A')}")
+    print(f"항목 수: {len(feed.entries)}")
+
+    # 3. 키워드 목록 출력
+    print("\n" + "=" * 50)
+    print("트렌드 키워드 목록")
+    print("=" * 50)
+
+    for i, entry in enumerate(feed.entries[:15], 1):
+        keyword = entry.get('title', 'N/A')
+        traffic = entry.get('ht_approx_traffic', 'N/A')
+        print(f"{i:2}. {keyword} (검색량: {traffic})")
+
+    print("=" * 50)
+
+    return feed
+
+
 if __name__ == "__main__":
-    # 테스트
+    # 테스트 실행
     logging.basicConfig(level=logging.INFO)
 
-    print("=== Google Trends 키워드 수집 테스트 ===\n")
+    print("\n=== Google Trends 키워드 수집 테스트 ===\n")
+
+    # 테스트 함수 실행
+    test_google_trends()
+
+    print("\n=== 크롤러 클래스 테스트 ===\n")
 
     crawler = GoogleTrendsCrawler()
     keywords = crawler.fetch_trending_keywords(limit=10)
