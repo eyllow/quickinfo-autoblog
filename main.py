@@ -132,14 +132,18 @@ def run_auto_publish(
         post.content = content
         post.has_coupang = has_coupang
 
-        # 5. 이미지 삽입
+        # 5. 이미지 삽입 (본문 중간에 3~5개 삽입)
         logger.info("이미지 삽입 중...")
         content_with_images, featured_image_id = publisher.insert_images_to_content(
             content=post.content,
             keyword=selected_keyword,
-            count=3
+            count=5
         )
         post.content = content_with_images
+
+        # 글자수 최종 확인
+        final_char_count = len(post.content)
+        logger.info(f"최종 글자수: {final_char_count}자")
 
         # 6. 워드프레스 발행
         status = "draft" if is_draft else "publish"

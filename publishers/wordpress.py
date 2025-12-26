@@ -106,7 +106,7 @@ class WordPressPublisher:
         self,
         content: str,
         keyword: str,
-        count: int = 3
+        count: int = 5
     ) -> tuple:
         """
         본문에 이미지 삽입
@@ -114,56 +114,137 @@ class WordPressPublisher:
         Args:
             content: HTML 본문
             keyword: 키워드 (이미지 검색용)
-            count: 이미지 개수
+            count: 이미지 개수 (기본 5개)
 
         Returns:
             (수정된 본문, 첫 번째 이미지 ID) 튜플
         """
+        import re
+
         # Pexels에서 이미지 수집
+        print(f"  🖼️ 이미지 수집 중... ({keyword})")
         images = fetch_images(keyword, count)
 
         if not images:
             logger.warning("이미지를 찾을 수 없습니다.")
-            # 이미지 태그 제거
-            import re
             content = re.sub(r'\[IMAGE_\d+\]', '', content)
             return content, None
 
-        first_image_id = None
+        print(f"  ✅ {len(images)}개 이미지 수집 완료")
 
+        first_image_id = None
+        inserted_count = 0
+
+        # 1. [IMAGE_X] 태그가 있으면 해당 위치에 삽입
         for i, img in enumerate(images, 1):
             tag = f"[IMAGE_{i}]"
 
-            if tag not in content:
-                continue
+            if tag in content:
+                # 이미지 업로드
+                media_id = self.upload_image(img["url"])
 
-            # 이미지 업로드
-            media_id = self.upload_image(img["url"])
+                if media_id:
+                    if first_image_id is None:
+                        first_image_id = media_id
 
-            if media_id:
-                if first_image_id is None:
-                    first_image_id = media_id
+                    img_html = self._create_image_html(img, keyword)
+                    content = content.replace(tag, img_html)
+                    inserted_count += 1
+                    logger.info(f"이미지 {i} 삽입 완료 (태그 위치)")
+                else:
+                    content = content.replace(tag, "")
 
-                # 이미지 HTML 생성
-                img_html = f'''
-<figure style="text-align: center; margin: 30px 0;">
+        # 2. 이미지가 하나도 삽입되지 않았으면 자동 위치 삽입
+        if inserted_count == 0 and images:
+            print("  ⚠️ 이미지 태그가 없어 자동 위치 삽입...")
+            content, first_image_id = self._auto_insert_images(content, images, keyword)
+            inserted_count = min(3, len(images))
+
+        # 남은 이미지 태그 제거
+        content = re.sub(r'\[IMAGE_\d+\]', '', content)
+
+        print(f"  ✅ 총 {inserted_count}개 이미지 본문에 삽입 완료")
+        return content, first_image_id
+
+    def _create_image_html(self, img: dict, keyword: str) -> str:
+        """이미지 HTML 생성"""
+        alt_text = img.get('alt', f'{keyword} 관련 이미지')
+        photographer = img.get('photographer', 'Pexels')
+
+        return f'''
+<figure style="text-align: center; margin: 40px 0;">
     <img src="{img['url']}"
-         alt="{img['alt']}"
-         style="max-width: 100%; height: auto; border-radius: 8px;"
+         alt="{alt_text}"
+         style="max-width: 100%; height: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);"
          loading="lazy" />
-    <figcaption style="margin-top: 10px; color: #666; font-size: 14px;">
-        Photo by {img['photographer']} on Pexels
+    <figcaption style="margin-top: 12px; color: #888; font-size: 13px;">
+        {alt_text} | Photo by {photographer}
     </figcaption>
 </figure>
 '''
-                content = content.replace(tag, img_html)
-                logger.info(f"이미지 {i} 삽입 완료")
-            else:
-                content = content.replace(tag, "")
 
-        # 남은 이미지 태그 제거
+    def _auto_insert_images(self, content: str, images: list, keyword: str) -> tuple:
+        """
+        [IMAGE_X] 태그가 없을 때 자동으로 이미지 삽입
+
+        Args:
+            content: HTML 본문
+            images: 이미지 리스트
+            keyword: 키워드
+
+        Returns:
+            (수정된 본문, 첫 번째 이미지 ID)
+        """
         import re
-        content = re.sub(r'\[IMAGE_\d+\]', '', content)
+
+        first_image_id = None
+
+        # H2 또는 H3 태그 위치 찾기
+        headings = list(re.finditer(r'</h[23]>', content, re.IGNORECASE))
+
+        if len(headings) >= 2:
+            # 헤딩이 충분하면 2번째, 4번째, 6번째 헤딩 뒤에 삽입
+            insert_positions = []
+            for i, match in enumerate(headings):
+                if i in [1, 3, 5]:  # 2번째, 4번째, 6번째
+                    insert_positions.append(match.end())
+
+            # 뒤에서부터 삽입 (인덱스 변경 방지)
+            for idx, pos in enumerate(reversed(insert_positions)):
+                img_idx = len(insert_positions) - 1 - idx
+                if img_idx < len(images):
+                    img = images[img_idx]
+                    media_id = self.upload_image(img["url"])
+
+                    if media_id:
+                        if first_image_id is None:
+                            first_image_id = media_id
+                        img_html = self._create_image_html(img, keyword)
+                        content = content[:pos] + img_html + content[pos:]
+                        logger.info(f"이미지 자동 삽입 완료 (헤딩 뒤)")
+        else:
+            # 헤딩이 부족하면 </p> 태그 기준으로 삽입
+            paragraphs = list(re.finditer(r'</p>', content, re.IGNORECASE))
+            total_p = len(paragraphs)
+
+            if total_p >= 3:
+                # 1/3, 2/3 위치에 삽입
+                insert_positions = [
+                    paragraphs[total_p // 3].end(),
+                    paragraphs[total_p * 2 // 3].end(),
+                ]
+
+                for idx, pos in enumerate(reversed(insert_positions)):
+                    if idx < len(images):
+                        img = images[idx]
+                        media_id = self.upload_image(img["url"])
+
+                        if media_id:
+                            if first_image_id is None:
+                                first_image_id = media_id
+                            img_html = self._create_image_html(img, keyword)
+                            content = content[:pos] + img_html + content[pos:]
+                            logger.info(f"이미지 자동 삽입 완료 (단락 뒤)")
 
         return content, first_image_id
 

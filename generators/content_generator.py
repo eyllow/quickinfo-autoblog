@@ -144,11 +144,54 @@ class ContentGenerator:
         content = re.sub(r'^```html\s*', '', content, flags=re.MULTILINE)
         content = re.sub(r'\s*```$', '', content, flags=re.MULTILINE)
 
+        # 글자수 확인 및 확장
+        min_chars = 6000 if is_evergreen else 5000
+        if len(content) < min_chars:
+            print(f"  ⚠️ 글자수 부족 ({len(content)}자), 확장 중...")
+            content = self._expand_content(content, keyword, min_chars)
+            print(f"  ✅ 확장 완료 ({len(content)}자)")
+
         # 인간화 처리
         print("  🧑 인간화 처리 중...")
         content = humanize_content(content, keyword)
 
         return content.strip(), template_info['name']
+
+    def _expand_content(self, content: str, keyword: str, min_chars: int) -> str:
+        """
+        글자수가 부족한 경우 콘텐츠 확장
+
+        Args:
+            content: 현재 콘텐츠
+            keyword: 키워드
+            min_chars: 최소 글자수
+
+        Returns:
+            확장된 콘텐츠
+        """
+        expand_prompt = f"""아래 블로그 글이 {len(content)}자로 너무 짧습니다.
+{min_chars}자 이상이 되도록 각 섹션을 더 상세하게 확장해주세요.
+
+[확장 방법]
+1. 각 섹션에 구체적인 예시와 설명 추가
+2. 새로운 소제목(H3) 섹션 2~3개 추가
+3. 실제 사례나 통계 추가
+4. 주의사항이나 팁 추가
+
+[키워드]: {keyword}
+[현재 글]:
+{content}
+
+확장된 글을 HTML 형식으로 출력하세요.
+기존 [IMAGE_1], [IMAGE_2], [IMAGE_3] 태그는 그대로 유지하세요.
+"""
+        expanded = self._call_claude(expand_prompt, max_tokens=8000)
+
+        # HTML 코드 블록 제거
+        expanded = re.sub(r'^```html\s*', '', expanded, flags=re.MULTILINE)
+        expanded = re.sub(r'\s*```$', '', expanded, flags=re.MULTILINE)
+
+        return expanded.strip()
 
     def _extract_meta(self, content: str) -> str:
         """메타 설명 추출"""
@@ -158,12 +201,11 @@ class ContentGenerator:
         return ""
 
     def _clean_content(self, content: str) -> str:
-        """태그 정리"""
+        """태그 정리 (이미지 태그는 유지!)"""
         # 메타 태그 제거
         content = re.sub(r'\[META\].*?\[/META\]', '', content, flags=re.DOTALL)
-        # 남은 플레이스홀더 제거
-        content = re.sub(r'\[COUPANG\]', '', content)
-        content = re.sub(r'\[IMAGE_\d+\]', '', content)
+        # [COUPANG] 태그는 coupang.py에서 처리하므로 여기서는 유지
+        # [IMAGE_X] 태그도 wordpress.py에서 처리하므로 유지!
         return content.strip()
 
     def generate_full_post(
