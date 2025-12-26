@@ -1,0 +1,20 @@
+# Claude AI
+anthropic>=0.18.0
+
+# HTTP 요청
+requests>=2.31.0
+
+# HTML 파싱
+beautifulsoup4>=4.12.0
+
+# 환경 변수
+python-dotenv>=1.0.0
+
+# 스케줄러
+apscheduler>=3.10.0
+
+# RSS 파싱 (Google Trends)
+feedparser>=6.0.0
+
+# 이미지 처리
+Pillow>=10.0.0

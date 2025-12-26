@@ -1,0 +1,51 @@
+# 환경 변수
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 로그
+logs/*.log
+*.log
+
+# 데이터베이스
+*.db
+*.sqlite3
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 가상환경
+venv/
+env/
+.venv/
+
+# 임시 파일
+temp_screenshots/
+*.tmp
