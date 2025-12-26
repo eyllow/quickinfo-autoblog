@@ -132,11 +132,13 @@ def run_auto_publish(
         post.content = content
         post.has_coupang = has_coupang
 
-        # 5. 이미지 삽입 (본문 중간에 3~5개 삽입)
+        # 5. 이미지 삽입 (AI 판단에 따라 스크린샷 또는 Pexels 이미지 사용)
         logger.info("이미지 삽입 중...")
+        logger.info(f"이미지 타입: {post.image_types}")
         content_with_images, featured_image_id = publisher.insert_images_to_content(
             content=post.content,
             keyword=selected_keyword,
+            image_types=post.image_types,
             count=5
         )
         post.content = content_with_images
@@ -256,6 +258,8 @@ def show_recent_posts(limit: int = 10):
 
 def test_connection():
     """연결 테스트"""
+    from media.screenshot import is_screenshot_available
+
     print("\n" + "=" * 40)
     print("🔌 연결 테스트")
     print("=" * 40)
@@ -287,6 +291,12 @@ def test_connection():
         print("  ✅ Google Search: 설정됨")
     else:
         print("  ⚠️  Google Search: 설정 없음 (웹 검색 제한)")
+
+    # 스크린샷 기능 (Node.js + Puppeteer)
+    if is_screenshot_available():
+        print("  ✅ 스크린샷: 사용 가능 (Node.js + Puppeteer)")
+    else:
+        print("  ⚠️  스크린샷: 사용 불가 (Node.js/Puppeteer 필요)")
 
     print("=" * 40 + "\n")
 

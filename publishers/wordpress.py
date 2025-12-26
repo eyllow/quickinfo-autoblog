@@ -1,6 +1,7 @@
 """
 워드프레스 REST API 발행 모듈
 블로그 글을 워드프레스에 발행합니다.
+AI 판단에 따라 스크린샷 또는 Pexels 이미지를 사용합니다.
 """
 import logging
 import requests
@@ -14,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config.settings import settings
 from config.categories import get_category_id
 from media.image_fetcher import fetch_images
+from media.screenshot import ScreenshotCapture, is_screenshot_available
 
 logger = logging.getLogger(__name__)
 
@@ -102,18 +104,71 @@ class WordPressPublisher:
             logger.error(f"이미지 업로드 실패: {e}")
             return None
 
+    def upload_local_image(self, file_path: str, filename: str = None) -> Optional[int]:
+        """
+        로컬 이미지 파일 업로드 (스크린샷용)
+
+        Args:
+            file_path: 로컬 파일 경로
+            filename: 업로드할 파일명
+
+        Returns:
+            미디어 ID 또는 None
+        """
+        try:
+            file_path = Path(file_path)
+            if not file_path.exists():
+                logger.error(f"파일이 존재하지 않습니다: {file_path}")
+                return None
+
+            if not filename:
+                filename = file_path.name
+
+            # 파일 읽기
+            with open(file_path, 'rb') as f:
+                file_content = f.read()
+
+            # Content-Type 결정
+            content_type = "image/png" if filename.endswith('.png') else "image/jpeg"
+
+            # 워드프레스에 업로드
+            media_headers = {
+                "Authorization": self.headers["Authorization"],
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Type": content_type,
+            }
+
+            upload_response = requests.post(
+                f"{self.api_url}/media",
+                headers=media_headers,
+                data=file_content,
+                timeout=60
+            )
+            upload_response.raise_for_status()
+
+            media_id = upload_response.json().get("id")
+            media_url = upload_response.json().get("source_url", "")
+            logger.info(f"로컬 이미지 업로드 성공: ID {media_id}")
+            return media_id, media_url
+
+        except Exception as e:
+            logger.error(f"로컬 이미지 업로드 실패: {e}")
+            return None, None
+
     def insert_images_to_content(
         self,
         content: str,
         keyword: str,
+        image_types: List[str] = None,
         count: int = 5
     ) -> tuple:
         """
-        본문에 이미지 삽입
+        본문에 이미지 삽입 (AI 판단에 따라 스크린샷 또는 Pexels 이미지 사용)
 
         Args:
             content: HTML 본문
             keyword: 키워드 (이미지 검색용)
+            image_types: AI가 판단한 이미지 타입 리스트 (예: ["SCREENSHOT", "PEXELS", "PEXELS"])
             count: 이미지 개수 (기본 5개)
 
         Returns:
@@ -121,50 +176,124 @@ class WordPressPublisher:
         """
         import re
 
-        # Pexels에서 이미지 수집
-        print(f"  🖼️ 이미지 수집 중... ({keyword})")
-        images = fetch_images(keyword, count)
-
-        if not images:
-            logger.warning("이미지를 찾을 수 없습니다.")
-            content = re.sub(r'\[IMAGE_\d+\]', '', content)
-            return content, None
-
-        print(f"  ✅ {len(images)}개 이미지 수집 완료")
+        if image_types is None:
+            image_types = ["PEXELS"] * count
 
         first_image_id = None
         inserted_count = 0
 
-        # 1. [IMAGE_X] 태그가 있으면 해당 위치에 삽입
-        for i, img in enumerate(images, 1):
+        # 스크린샷 캡처 준비
+        screenshot_capturer = None
+        if "SCREENSHOT" in image_types and is_screenshot_available():
+            screenshot_capturer = ScreenshotCapture()
+            print(f"  📸 스크린샷 기능 활성화됨")
+
+        # Pexels 이미지 미리 수집 (PEXELS 타입이 있는 경우만)
+        pexels_images = []
+        pexels_count = image_types.count("PEXELS")
+        if pexels_count > 0:
+            print(f"  🖼️ Pexels 이미지 수집 중... ({keyword})")
+            pexels_images = fetch_images(keyword, pexels_count)
+            if pexels_images:
+                print(f"  ✅ {len(pexels_images)}개 Pexels 이미지 수집 완료")
+
+        pexels_index = 0
+
+        # [IMAGE_X] 태그 처리
+        for i, img_type in enumerate(image_types, 1):
             tag = f"[IMAGE_{i}]"
 
-            if tag in content:
-                # 이미지 업로드
-                media_id = self.upload_image(img["url"])
+            if tag not in content:
+                continue
 
-                if media_id:
-                    if first_image_id is None:
-                        first_image_id = media_id
+            if img_type == "SCREENSHOT" and screenshot_capturer:
+                # 스크린샷 캡처
+                print(f"  📸 스크린샷 캡처 중... ({keyword})")
+                screenshot_result = screenshot_capturer.capture(keyword)
 
-                    img_html = self._create_image_html(img, keyword)
-                    content = content.replace(tag, img_html)
-                    inserted_count += 1
-                    logger.info(f"이미지 {i} 삽입 완료 (태그 위치)")
+                if screenshot_result and screenshot_result.get("path"):
+                    # 로컬 이미지 업로드
+                    result = self.upload_local_image(screenshot_result["path"])
+                    if result and result[0]:
+                        media_id, media_url = result
+                        if first_image_id is None:
+                            first_image_id = media_id
+
+                        img_html = self._create_screenshot_html(
+                            media_url,
+                            screenshot_result.get("alt", f"{keyword} 스크린샷"),
+                            screenshot_result.get("source", "웹사이트")
+                        )
+                        content = content.replace(tag, img_html)
+                        inserted_count += 1
+                        logger.info(f"스크린샷 {i} 삽입 완료")
+                    else:
+                        content = content.replace(tag, "")
+                else:
+                    # 스크린샷 실패시 Pexels로 대체
+                    print(f"  ⚠️ 스크린샷 실패, Pexels로 대체")
+                    if pexels_index < len(pexels_images):
+                        img = pexels_images[pexels_index]
+                        pexels_index += 1
+                        media_id = self.upload_image(img["url"])
+                        if media_id:
+                            if first_image_id is None:
+                                first_image_id = media_id
+                            img_html = self._create_image_html(img, keyword)
+                            content = content.replace(tag, img_html)
+                            inserted_count += 1
+                        else:
+                            content = content.replace(tag, "")
+                    else:
+                        content = content.replace(tag, "")
+
+            elif img_type == "PEXELS":
+                # Pexels 이미지 사용
+                if pexels_index < len(pexels_images):
+                    img = pexels_images[pexels_index]
+                    pexels_index += 1
+
+                    media_id = self.upload_image(img["url"])
+                    if media_id:
+                        if first_image_id is None:
+                            first_image_id = media_id
+
+                        img_html = self._create_image_html(img, keyword)
+                        content = content.replace(tag, img_html)
+                        inserted_count += 1
+                        logger.info(f"Pexels 이미지 {i} 삽입 완료")
+                    else:
+                        content = content.replace(tag, "")
                 else:
                     content = content.replace(tag, "")
+            else:
+                content = content.replace(tag, "")
 
-        # 2. 이미지가 하나도 삽입되지 않았으면 자동 위치 삽입
-        if inserted_count == 0 and images:
+        # 이미지가 하나도 삽입되지 않았으면 자동 위치 삽입
+        if inserted_count == 0 and pexels_images:
             print("  ⚠️ 이미지 태그가 없어 자동 위치 삽입...")
-            content, first_image_id = self._auto_insert_images(content, images, keyword)
-            inserted_count = min(3, len(images))
+            content, first_image_id = self._auto_insert_images(content, pexels_images, keyword)
+            inserted_count = min(3, len(pexels_images))
 
         # 남은 이미지 태그 제거
         content = re.sub(r'\[IMAGE_\d+\]', '', content)
 
         print(f"  ✅ 총 {inserted_count}개 이미지 본문에 삽입 완료")
         return content, first_image_id
+
+    def _create_screenshot_html(self, url: str, alt: str, source: str) -> str:
+        """스크린샷 HTML 생성"""
+        return f'''
+<figure style="text-align: center; margin: 40px 0;">
+    <img src="{url}"
+         alt="{alt}"
+         style="max-width: 100%; height: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #e0e0e0;"
+         loading="lazy" />
+    <figcaption style="margin-top: 12px; color: #888; font-size: 13px;">
+        {alt} | 출처: {source}
+    </figcaption>
+</figure>
+'''
 
     def _create_image_html(self, img: dict, keyword: str) -> str:
         """이미지 HTML 생성"""
@@ -372,6 +501,7 @@ def publish_to_wordpress(
     excerpt: str = "",
     category: str = "트렌드",
     keyword: str = "",
+    image_types: List[str] = None,
     status: str = "draft"
 ) -> Optional[Dict]:
     """
@@ -383,6 +513,7 @@ def publish_to_wordpress(
         excerpt: 메타 설명
         category: 카테고리
         keyword: 키워드 (이미지 검색용)
+        image_types: AI가 판단한 이미지 타입 리스트
         status: 발행 상태
 
     Returns:
@@ -393,7 +524,7 @@ def publish_to_wordpress(
     # 이미지 삽입
     if keyword:
         content, featured_image_id = publisher.insert_images_to_content(
-            content, keyword, count=3
+            content, keyword, image_types=image_types, count=5
         )
     else:
         featured_image_id = None
