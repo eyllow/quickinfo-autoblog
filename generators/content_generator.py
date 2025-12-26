@@ -1,10 +1,10 @@
 """
 Claude AI 콘텐츠 생성 모듈
-키워드를 받아 고품질 블로그 글을 생성합니다.
+프롬프트 기반으로 AI가 스스로 판단하여 고품질 블로그 글을 생성합니다.
 """
 import re
 import logging
-from typing import Optional
+from typing import Optional, List, Tuple
 from dataclasses import dataclass
 
 import anthropic
@@ -17,11 +17,10 @@ from config.settings import settings
 from config.categories import get_category_for_keyword, is_coupang_allowed
 from crawlers.web_search import search_and_get_context
 from generators.prompts import (
-    HUMAN_PERSONA_PROMPT,
     SYSTEM_PROMPT,
-    generate_content_prompt,
-    generate_title_prompt,
-    get_random_template,
+    get_content_prompt,
+    get_title_prompt,
+    get_expand_prompt,
 )
 from generators.humanizer import humanize_content
 
@@ -36,6 +35,7 @@ class GeneratedPost:
     excerpt: str
     category: str
     template: str
+    image_types: List[str] = None  # AI가 판단한 이미지 타입들
     has_coupang: bool = False
 
 
@@ -50,8 +50,7 @@ class ContentGenerator:
         self,
         user_prompt: str,
         system_prompt: str = SYSTEM_PROMPT,
-        max_tokens: int = 8000,
-        use_persona: bool = True
+        max_tokens: int = 8000
     ) -> str:
         """
         Claude API 호출
@@ -60,22 +59,15 @@ class ContentGenerator:
             user_prompt: 사용자 프롬프트
             system_prompt: 시스템 프롬프트
             max_tokens: 최대 토큰 수
-            use_persona: 인간 페르소나 사용 여부
 
         Returns:
             생성된 텍스트
         """
         try:
-            # 인간 페르소나 프롬프트 추가 (AI 탐지 회피)
-            if use_persona:
-                full_system = HUMAN_PERSONA_PROMPT + "\n\n" + system_prompt
-            else:
-                full_system = system_prompt
-
             message = self.client.messages.create(
                 model=self.model,
                 max_tokens=max_tokens,
-                system=full_system,
+                system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}]
             )
 
@@ -95,8 +87,8 @@ class ContentGenerator:
         Returns:
             생성된 제목
         """
-        prompt = generate_title_prompt(keyword)
-        title = self._call_claude(prompt, max_tokens=200, use_persona=False)
+        prompt = get_title_prompt(keyword)
+        title = self._call_claude(prompt, max_tokens=200)
         return title.strip().strip('"\'')
 
     def generate_content(
@@ -104,7 +96,7 @@ class ContentGenerator:
         keyword: str,
         category: str,
         is_evergreen: bool = False
-    ) -> tuple:
+    ) -> Tuple[str, List[str]]:
         """
         블로그 본문 생성
 
@@ -114,7 +106,7 @@ class ContentGenerator:
             is_evergreen: 에버그린 콘텐츠 여부
 
         Returns:
-            (HTML 본문, 템플릿 이름) 튜플
+            (HTML 본문, 이미지 타입 리스트) 튜플
         """
         # 웹검색으로 최신 정보 수집
         web_context = ""
@@ -124,68 +116,83 @@ class ContentGenerator:
             if web_context:
                 print(f"  ✅ 검색 결과 수집 완료 ({len(web_context)}자)")
 
-        # 랜덤 템플릿 선택
-        template_key, template_info = get_random_template()
-        print(f"  📝 선택된 템플릿: {template_info['name']}")
-
         # 프롬프트 생성
-        prompt = generate_content_prompt(
+        prompt = get_content_prompt(
             keyword=keyword,
             category=category,
-            template_key=template_key,
-            web_context=web_context,
+            search_context=web_context,
             is_evergreen=is_evergreen
         )
 
         # 콘텐츠 생성
+        print("  🤖 AI 콘텐츠 생성 중...")
         content = self._call_claude(prompt, max_tokens=8000)
 
         # HTML 코드 블록 제거
         content = re.sub(r'^```html\s*', '', content, flags=re.MULTILINE)
         content = re.sub(r'\s*```$', '', content, flags=re.MULTILINE)
 
+        # AI가 판단한 이미지 타입 파싱
+        image_types = self._parse_image_types(content)
+        print(f"  🖼️ AI 이미지 타입 판단: {image_types}")
+
+        # 이미지 타입 태그 제거 (실제 HTML에서는 제거)
+        content = re.sub(r'\[IMAGE_TYPE:(SCREENSHOT|PEXELS)\]\s*', '', content)
+
         # 글자수 확인 및 확장
-        min_chars = 6000 if is_evergreen else 5000
-        if len(content) < min_chars:
+        target_length = 6000 if is_evergreen else 5000
+        if len(content) < target_length:
             print(f"  ⚠️ 글자수 부족 ({len(content)}자), 확장 중...")
-            content = self._expand_content(content, keyword, min_chars)
+            content = self._expand_content(content, keyword, target_length)
             print(f"  ✅ 확장 완료 ({len(content)}자)")
 
         # 인간화 처리
         print("  🧑 인간화 처리 중...")
         content = humanize_content(content, keyword)
 
-        return content.strip(), template_info['name']
+        return content.strip(), image_types
 
-    def _expand_content(self, content: str, keyword: str, min_chars: int) -> str:
+    def _parse_image_types(self, content: str) -> List[str]:
+        """
+        AI가 지정한 이미지 타입 파싱
+
+        Args:
+            content: 생성된 콘텐츠
+
+        Returns:
+            이미지 타입 리스트 (예: ["SCREENSHOT", "PEXELS", "PEXELS"])
+        """
+        pattern = r'\[IMAGE_TYPE:(SCREENSHOT|PEXELS)\]'
+        matches = re.findall(pattern, content)
+
+        # 매치가 없으면 기본값 (모두 PEXELS)
+        if not matches:
+            # [IMAGE_N] 태그 개수 확인
+            image_tags = re.findall(r'\[IMAGE_\d+\]', content)
+            return ["PEXELS"] * len(image_tags)
+
+        return matches
+
+    def _expand_content(self, content: str, keyword: str, target_length: int) -> str:
         """
         글자수가 부족한 경우 콘텐츠 확장
 
         Args:
             content: 현재 콘텐츠
             keyword: 키워드
-            min_chars: 최소 글자수
+            target_length: 목표 글자수
 
         Returns:
             확장된 콘텐츠
         """
-        expand_prompt = f"""아래 블로그 글이 {len(content)}자로 너무 짧습니다.
-{min_chars}자 이상이 되도록 각 섹션을 더 상세하게 확장해주세요.
+        prompt = get_expand_prompt(
+            content=content,
+            keyword=keyword,
+            current_length=len(content),
+            target_length=target_length
+        )
 
-[확장 방법]
-1. 각 섹션에 구체적인 예시와 설명 추가
-2. 새로운 소제목(H3) 섹션 2~3개 추가
-3. 실제 사례나 통계 추가
-4. 주의사항이나 팁 추가
-
-[키워드]: {keyword}
-[현재 글]:
-{content}
-
-확장된 글을 HTML 형식으로 출력하세요.
-기존 [IMAGE_1], [IMAGE_2], [IMAGE_3] 태그는 그대로 유지하세요.
-"""
-        expanded = self._call_claude(expand_prompt, max_tokens=8000)
+        expanded = self._call_claude(prompt, max_tokens=8000)
 
         # HTML 코드 블록 제거
         expanded = re.sub(r'^```html\s*', '', expanded, flags=re.MULTILINE)
@@ -194,18 +201,28 @@ class ContentGenerator:
         return expanded.strip()
 
     def _extract_meta(self, content: str) -> str:
-        """메타 설명 추출"""
+        """메타 설명 추출 또는 생성"""
+        # [META] 태그 확인
         match = re.search(r'\[META\](.*?)\[/META\]', content, re.DOTALL)
         if match:
             return match.group(1).strip()[:160]
+
+        # 첫 번째 <p> 태그 내용에서 추출
+        p_match = re.search(r'<p[^>]*>(.*?)</p>', content, re.DOTALL)
+        if p_match:
+            text = re.sub(r'<[^>]+>', '', p_match.group(1))
+            return text[:160].strip()
+
         return ""
 
     def _clean_content(self, content: str) -> str:
         """태그 정리 (이미지 태그는 유지!)"""
         # 메타 태그 제거
         content = re.sub(r'\[META\].*?\[/META\]', '', content, flags=re.DOTALL)
-        # [COUPANG] 태그는 coupang.py에서 처리하므로 여기서는 유지
-        # [IMAGE_X] 태그도 wordpress.py에서 처리하므로 유지!
+        # 이미지 타입 태그 제거
+        content = re.sub(r'\[IMAGE_TYPE:(SCREENSHOT|PEXELS)\]\s*', '', content)
+        # [COUPANG] 태그는 coupang.py에서 처리
+        # [IMAGE_X] 태그는 wordpress.py에서 처리
         return content.strip()
 
     def generate_full_post(
@@ -236,9 +253,9 @@ class ContentGenerator:
         title = self.generate_title(keyword)
         print(f"  ✅ 제목: {title}")
 
-        # 본문 생성
+        # 본문 생성 (이미지 타입 포함)
         print("\n[3/4] 본문 생성 중...")
-        content, template_name = self.generate_content(
+        content, image_types = self.generate_content(
             keyword=keyword,
             category=category,
             is_evergreen=is_evergreen
@@ -256,10 +273,14 @@ class ContentGenerator:
         # 콘텐츠 정리
         content = self._clean_content(content)
 
+        # 콘텐츠 타입 (템플릿 대신 사용)
+        content_type = "에버그린" if is_evergreen else "트렌드"
+
         print("\n[4/4] 최종 결과")
         print(f"  └─ 제목: {title}")
         print(f"  └─ 카테고리: {category}")
-        print(f"  └─ 템플릿: {template_name}")
+        print(f"  └─ 콘텐츠 타입: {content_type}")
+        print(f"  └─ 이미지 타입: {image_types}")
         print(f"  └─ 쿠팡: {'✅ 허용' if has_coupang else '❌ 비허용'}")
         print(f"  └─ 글자수: {len(content)}자")
 
@@ -272,7 +293,8 @@ class ContentGenerator:
             content=content,
             excerpt=excerpt,
             category=category,
-            template=template_name,
+            template=content_type,
+            image_types=image_types,
             has_coupang=has_coupang,
         )
 
@@ -284,11 +306,11 @@ if __name__ == "__main__":
     generator = ContentGenerator()
 
     # 트렌드 키워드 테스트
-    post = generator.generate_full_post("연말정산", is_evergreen=True)
+    post = generator.generate_full_post("혜리", is_evergreen=False)
 
     print("\n=== 생성 결과 ===")
     print(f"제목: {post.title}")
     print(f"카테고리: {post.category}")
-    print(f"템플릿: {post.template}")
+    print(f"이미지 타입: {post.image_types}")
     print(f"쿠팡: {post.has_coupang}")
     print(f"본문 미리보기:\n{post.content[:500]}...")
