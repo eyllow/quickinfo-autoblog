@@ -61,107 +61,123 @@ class WordPressPublisher:
             logger.error(f"워드프레스 연결 실패: {e}")
             return False
 
-    def upload_image(self, image_url: str, filename: str = None) -> Optional[int]:
+    def upload_image(self, image_url: str, filename: str = None, retry: int = 3) -> Optional[int]:
         """
-        이미지 업로드
+        이미지 업로드 (재시도 포함)
 
         Args:
             image_url: 이미지 URL
             filename: 파일명
+            retry: 재시도 횟수
 
         Returns:
             미디어 ID 또는 None
         """
-        try:
-            # 이미지 다운로드
-            response = requests.get(image_url, timeout=30)
-            response.raise_for_status()
+        for attempt in range(retry):
+            try:
+                # 이미지 다운로드
+                response = requests.get(image_url, timeout=30)
+                response.raise_for_status()
 
-            if not filename:
-                filename = image_url.split("/")[-1].split("?")[0]
-                if not filename.endswith(('.jpg', '.jpeg', '.png', '.gif')):
-                    filename = "image.jpg"
+                if not filename:
+                    filename = image_url.split("/")[-1].split("?")[0]
+                    if not filename.endswith(('.jpg', '.jpeg', '.png', '.gif')):
+                        filename = "image.jpg"
 
-            # 워드프레스에 업로드
-            media_headers = {
-                "Authorization": self.headers["Authorization"],
-                "Content-Disposition": f'attachment; filename="{filename}"',
-                "Content-Type": "image/jpeg",
-            }
+                # 파일명 안전하게 처리
+                safe_filename = ''.join(c for c in filename if ord(c) < 128)
+                if not safe_filename:
+                    safe_filename = f"image_{int(time.time())}.jpg"
 
-            upload_response = requests.post(
-                f"{self.api_url}/media",
-                headers=media_headers,
-                data=response.content,
-                timeout=60
-            )
-            upload_response.raise_for_status()
+                # 워드프레스에 업로드
+                media_headers = {
+                    "Authorization": self.headers["Authorization"],
+                    "Content-Disposition": f'attachment; filename="{safe_filename}"',
+                    "Content-Type": "image/jpeg",
+                }
 
-            media_id = upload_response.json().get("id")
-            logger.info(f"이미지 업로드 성공: ID {media_id}")
-            return media_id
+                upload_response = requests.post(
+                    f"{self.api_url}/media",
+                    headers=media_headers,
+                    data=response.content,
+                    timeout=60
+                )
+                upload_response.raise_for_status()
 
-        except Exception as e:
-            logger.error(f"이미지 업로드 실패: {e}")
-            return None
+                media_id = upload_response.json().get("id")
+                logger.info(f"이미지 업로드 성공: ID {media_id}")
+                return media_id
 
-    def upload_local_image(self, file_path: str, filename: str = None) -> Optional[int]:
+            except Exception as e:
+                logger.warning(f"이미지 업로드 시도 {attempt+1}/{retry} 실패: {e}")
+                if attempt < retry - 1:
+                    time.sleep(2)  # 2초 대기 후 재시도
+
+        logger.error(f"이미지 업로드 최종 실패: {image_url}")
+        return None
+
+    def upload_local_image(self, file_path: str, filename: str = None, retry: int = 3) -> Optional[int]:
         """
-        로컬 이미지 파일 업로드 (스크린샷용, 인코딩 안전)
+        로컬 이미지 파일 업로드 (스크린샷용, 재시도 포함)
 
         Args:
             file_path: 로컬 파일 경로
             filename: 업로드할 파일명
+            retry: 재시도 횟수
 
         Returns:
             (미디어 ID, 미디어 URL) 튜플 또는 (None, None)
         """
-        try:
-            file_path = Path(file_path)
-            if not file_path.exists():
-                logger.error(f"파일이 존재하지 않습니다: {file_path}")
-                return None, None
-
-            if not filename:
-                filename = file_path.name
-
-            # 파일명에서 비ASCII 문자 제거 (인코딩 문제 해결)
-            safe_filename = ''.join(c for c in filename if ord(c) < 128)
-            if not safe_filename or not safe_filename.replace('.', '').replace('_', ''):
-                # 안전한 파일명이 없으면 타임스탬프로 생성
-                ext = '.png' if filename.endswith('.png') else '.jpg'
-                safe_filename = f"image_{int(time.time())}{ext}"
-
-            # 파일 읽기
-            with open(file_path, 'rb') as f:
-                file_content = f.read()
-
-            # Content-Type 결정
-            content_type = "image/png" if safe_filename.endswith('.png') else "image/jpeg"
-
-            # 워드프레스에 업로드
-            media_headers = {
-                "Authorization": self.headers["Authorization"],
-                "Content-Disposition": f'attachment; filename="{safe_filename}"',
-                "Content-Type": content_type,
-            }
-
-            upload_response = requests.post(
-                f"{self.api_url}/media",
-                headers=media_headers,
-                data=file_content,
-                timeout=60
-            )
-            upload_response.raise_for_status()
-
-            media_id = upload_response.json().get("id")
-            media_url = upload_response.json().get("source_url", "")
-            logger.info(f"로컬 이미지 업로드 성공: ID {media_id}")
-            return media_id, media_url
-
-        except Exception as e:
-            logger.error(f"로컬 이미지 업로드 실패: {e}")
+        file_path = Path(file_path)
+        if not file_path.exists():
+            logger.error(f"파일이 존재하지 않습니다: {file_path}")
             return None, None
+
+        if not filename:
+            filename = file_path.name
+
+        # 파일명에서 비ASCII 문자 제거 (인코딩 문제 해결)
+        safe_filename = ''.join(c for c in filename if ord(c) < 128)
+        if not safe_filename or not safe_filename.replace('.', '').replace('_', ''):
+            ext = '.png' if filename.endswith('.png') else '.jpg'
+            safe_filename = f"image_{int(time.time())}{ext}"
+
+        # 파일 읽기
+        with open(file_path, 'rb') as f:
+            file_content = f.read()
+
+        # Content-Type 결정
+        content_type = "image/png" if safe_filename.endswith('.png') else "image/jpeg"
+
+        for attempt in range(retry):
+            try:
+                # 워드프레스에 업로드
+                media_headers = {
+                    "Authorization": self.headers["Authorization"],
+                    "Content-Disposition": f'attachment; filename="{safe_filename}"',
+                    "Content-Type": content_type,
+                }
+
+                upload_response = requests.post(
+                    f"{self.api_url}/media",
+                    headers=media_headers,
+                    data=file_content,
+                    timeout=60
+                )
+                upload_response.raise_for_status()
+
+                media_id = upload_response.json().get("id")
+                media_url = upload_response.json().get("source_url", "")
+                logger.info(f"로컬 이미지 업로드 성공: ID {media_id}")
+                return media_id, media_url
+
+            except Exception as e:
+                logger.warning(f"로컬 이미지 업로드 시도 {attempt+1}/{retry} 실패: {e}")
+                if attempt < retry - 1:
+                    time.sleep(2)  # 2초 대기 후 재시도
+
+        logger.error(f"로컬 이미지 업로드 최종 실패: {file_path}")
+        return None, None
 
     def insert_images_to_content(
         self,
@@ -215,9 +231,9 @@ class WordPressPublisher:
                 continue
 
             if img_type == "SCREENSHOT" and screenshot_capturer:
-                # 스크린샷 캡처
+                # 스크린샷 캡처 (fallback 포함)
                 print(f"  📸 스크린샷 캡처 중... ({keyword})")
-                screenshot_result = screenshot_capturer.capture(keyword)
+                screenshot_result = screenshot_capturer.capture_with_fallback(keyword)
 
                 if screenshot_result and screenshot_result.get("path"):
                     # 로컬 이미지 업로드

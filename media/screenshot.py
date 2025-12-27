@@ -274,6 +274,59 @@ class ScreenshotCapture:
             return None
         return self.capture(keyword, url=site_info["url"], is_person=False)
 
+    def capture_with_fallback(self, keyword: str, retry: int = 2) -> Optional[Dict]:
+        """
+        여러 URL로 스크린샷 시도 (fallback 포함)
+
+        Args:
+            keyword: 키워드
+            retry: 각 URL당 재시도 횟수
+
+        Returns:
+            스크린샷 정보 또는 None
+        """
+        # 시도할 URL 목록 생성
+        urls_to_try = []
+
+        # 1. 공식 사이트가 있으면 우선 시도
+        site_info = self.get_official_site(keyword)
+        if site_info:
+            urls_to_try.append({
+                "url": site_info["url"],
+                "source": site_info["name"],
+                "is_person": False
+            })
+
+        # 2. 네이버 뉴스 검색
+        urls_to_try.append({
+            "url": f"https://search.naver.com/search.naver?where=news&query={keyword}",
+            "source": "네이버 뉴스",
+            "is_person": True
+        })
+
+        # 3. 다음 뉴스 검색 (백업)
+        urls_to_try.append({
+            "url": f"https://search.daum.net/search?w=news&q={keyword}",
+            "source": "다음 뉴스",
+            "is_person": True
+        })
+
+        for url_info in urls_to_try:
+            for attempt in range(retry):
+                logger.info(f"스크린샷 시도: {url_info['source']} (시도 {attempt+1}/{retry})")
+                result = self.capture(
+                    keyword,
+                    url=url_info["url"],
+                    is_person=url_info["is_person"]
+                )
+                if result:
+                    result["source"] = url_info["source"]
+                    return result
+                time.sleep(1)  # 재시도 전 대기
+
+        logger.error(f"모든 스크린샷 시도 실패: {keyword}")
+        return None
+
 
 def capture_screenshot(keyword: str, is_person: bool = None) -> Optional[Dict]:
     """

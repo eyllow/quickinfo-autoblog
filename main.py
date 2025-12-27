@@ -14,6 +14,7 @@ from generators.content_generator import ContentGenerator
 from publishers.wordpress import WordPressPublisher
 from publishers.coupang import insert_coupang_banner
 from database.db_manager import DBManager
+from media.image_fetcher import ImageFetcher
 
 # 로깅 설정
 logging.basicConfig(
@@ -53,6 +54,9 @@ def run_auto_publish(
     trends = GoogleTrendsCrawler()
     generator = ContentGenerator()
     publisher = WordPressPublisher()
+
+    # 이미지 중복 방지 캐시 초기화
+    ImageFetcher.reset_used_images()
 
     result = {
         "success": False,
