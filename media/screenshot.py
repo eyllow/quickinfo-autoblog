@@ -7,6 +7,8 @@ import logging
 import subprocess
 import tempfile
 import os
+import time
+import hashlib
 from pathlib import Path
 from typing import Optional, Dict
 from datetime import datetime
@@ -192,10 +194,10 @@ class ScreenshotCapture:
                     # 그 외에는 뉴스 검색
                     url = keyword
 
-        # 출력 파일 경로
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        safe_keyword = "".join(c for c in keyword if c.isalnum() or c in "가-힣")[:20]
-        output_path = self.output_dir / f"screenshot_{safe_keyword}_{timestamp}.png"
+        # 출력 파일 경로 (한글 제거, 해시 사용)
+        timestamp = int(time.time())
+        keyword_hash = hashlib.md5(keyword.encode('utf-8')).hexdigest()[:8]
+        output_path = self.output_dir / f"screenshot_{keyword_hash}_{timestamp}.png"
 
         try:
             logger.info(f"스크린샷 캡처 중: {keyword} -> {url}")

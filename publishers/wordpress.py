@@ -5,6 +5,7 @@ AI 판단에 따라 스크린샷 또는 Pexels 이미지를 사용합니다.
 """
 import logging
 import requests
+import time
 from typing import Optional, List, Dict
 from base64 import b64encode
 
@@ -106,35 +107,42 @@ class WordPressPublisher:
 
     def upload_local_image(self, file_path: str, filename: str = None) -> Optional[int]:
         """
-        로컬 이미지 파일 업로드 (스크린샷용)
+        로컬 이미지 파일 업로드 (스크린샷용, 인코딩 안전)
 
         Args:
             file_path: 로컬 파일 경로
             filename: 업로드할 파일명
 
         Returns:
-            미디어 ID 또는 None
+            (미디어 ID, 미디어 URL) 튜플 또는 (None, None)
         """
         try:
             file_path = Path(file_path)
             if not file_path.exists():
                 logger.error(f"파일이 존재하지 않습니다: {file_path}")
-                return None
+                return None, None
 
             if not filename:
                 filename = file_path.name
+
+            # 파일명에서 비ASCII 문자 제거 (인코딩 문제 해결)
+            safe_filename = ''.join(c for c in filename if ord(c) < 128)
+            if not safe_filename or not safe_filename.replace('.', '').replace('_', ''):
+                # 안전한 파일명이 없으면 타임스탬프로 생성
+                ext = '.png' if filename.endswith('.png') else '.jpg'
+                safe_filename = f"image_{int(time.time())}{ext}"
 
             # 파일 읽기
             with open(file_path, 'rb') as f:
                 file_content = f.read()
 
             # Content-Type 결정
-            content_type = "image/png" if filename.endswith('.png') else "image/jpeg"
+            content_type = "image/png" if safe_filename.endswith('.png') else "image/jpeg"
 
             # 워드프레스에 업로드
             media_headers = {
                 "Authorization": self.headers["Authorization"],
-                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Disposition": f'attachment; filename="{safe_filename}"',
                 "Content-Type": content_type,
             }
 
