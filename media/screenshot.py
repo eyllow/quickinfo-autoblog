@@ -17,6 +17,18 @@ logger = logging.getLogger(__name__)
 SCRIPT_DIR = Path(__file__).resolve().parent
 SCREENSHOT_SCRIPT = SCRIPT_DIR / "screenshot.js"
 
+# Puppeteer/Chrome 실행 옵션 (서버 환경 호환)
+CHROME_ARGS = [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-gpu',
+    '--single-process',
+    '--no-zygote',
+    '--disable-extensions',
+    '--disable-background-networking',
+]
+
 # 인물/연예인 키워드 패턴
 PERSON_KEYWORDS = [
     # 연예인
@@ -69,6 +81,26 @@ OFFICIAL_SITES = {
     "날씨": {
         "url": "https://weather.naver.com/",
         "name": "네이버 날씨",
+    },
+    "자동차보험": {
+        "url": "https://www.knia.or.kr/",
+        "name": "손해보험협회",
+    },
+    "실비보험": {
+        "url": "https://www.klia.or.kr/",
+        "name": "생명보험협회",
+    },
+    "건강보험": {
+        "url": "https://www.nhis.or.kr/",
+        "name": "국민건강보험공단",
+    },
+    "국민연금": {
+        "url": "https://www.nps.or.kr/",
+        "name": "국민연금공단",
+    },
+    "고용보험": {
+        "url": "https://www.ei.go.kr/",
+        "name": "고용보험",
     },
 }
 

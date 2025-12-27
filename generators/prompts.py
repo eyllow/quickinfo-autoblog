@@ -99,6 +99,34 @@ TREND_CONTENT_PROMPT = """
 - 추상적인 내용만 쓰지 말고 구체적인 팩트 포함
 - 출처를 자연스럽게 언급 ("최근 뉴스에 따르면~", "공식 발표에 의하면~")
 
+### 9. 관련 사이트 링크 삽입 (매우 중요!)
+
+웹검색 결과에서 신뢰할 수 있는 공식 사이트 링크를 본문에 자연스럽게 포함해.
+
+**필수 포함:**
+- 정부/공공기관 사이트 (홈택스, 정부24, 서민금융진흥원 등)
+- 공식 서비스 사이트 (은행, 증권사, 공식 홈페이지)
+- 뉴스 출처 링크
+
+**링크 삽입 형식:**
+<p>👉 <a href="https://실제URL" target="_blank" rel="noopener">사이트명 바로가기</a></p>
+
+**삽입 위치:**
+- 해당 내용 설명 직후 자연스럽게 배치
+- 섹션당 1~2개 링크
+- 글 마지막에 "관련 링크 모음" 섹션 필수 추가
+
+**예시:**
+청년도약계좌 가입은 서민금융진흥원에서 할 수 있어요.
+<p>👉 <a href="https://www.kinfa.or.kr" target="_blank" rel="noopener">서민금융진흥원 바로가기</a></p>
+
+**글 마지막 필수 섹션:**
+<h3 style="font-size: 20px; font-weight: 600; color: #333; margin-top: 30px;">📌 관련 링크 모음</h3>
+<ul style="padding-left: 20px;">
+  <li style="margin: 10px 0;"><a href="URL1" target="_blank" rel="noopener">사이트1</a> - 간단 설명</li>
+  <li style="margin: 10px 0;"><a href="URL2" target="_blank" rel="noopener">사이트2</a> - 간단 설명</li>
+</ul>
+
 ## 출력 형식
 
 바로 HTML 본문 내용만 출력해. 다른 설명 없이 <h2>로 시작해.
@@ -155,6 +183,34 @@ EVERGREEN_CONTENT_PROMPT = """
 - 주의사항
 - 실제 예시
 - 마무리 요약
+
+### 8. 관련 사이트 링크 삽입 (매우 중요!)
+
+웹검색 결과에서 신뢰할 수 있는 공식 사이트 링크를 본문에 자연스럽게 포함해.
+
+**필수 포함:**
+- 정부/공공기관 사이트 (홈택스, 정부24, 서민금융진흥원 등)
+- 공식 서비스 사이트 (은행, 증권사, 공식 홈페이지)
+- 뉴스 출처 링크
+
+**링크 삽입 형식:**
+<p>👉 <a href="https://실제URL" target="_blank" rel="noopener">사이트명 바로가기</a></p>
+
+**삽입 위치:**
+- 해당 내용 설명 직후 자연스럽게 배치
+- 섹션당 1~2개 링크
+- 글 마지막에 "관련 링크 모음" 섹션 필수 추가
+
+**예시:**
+청년도약계좌 가입은 서민금융진흥원에서 할 수 있어요.
+<p>👉 <a href="https://www.kinfa.or.kr" target="_blank" rel="noopener">서민금융진흥원 바로가기</a></p>
+
+**글 마지막 필수 섹션:**
+<h3 style="font-size: 20px; font-weight: 600; color: #333; margin-top: 30px;">📌 관련 링크 모음</h3>
+<ul style="padding-left: 20px;">
+  <li style="margin: 10px 0;"><a href="URL1" target="_blank" rel="noopener">사이트1</a> - 간단 설명</li>
+  <li style="margin: 10px 0;"><a href="URL2" target="_blank" rel="noopener">사이트2</a> - 간단 설명</li>
+</ul>
 
 ## 출력 형식
 

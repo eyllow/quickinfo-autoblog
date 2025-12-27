@@ -27,8 +27,15 @@ const OFFICIAL_SITES = {
     '주택청약': 'https://www.applyhome.co.kr/',
     '환율': 'https://finance.naver.com/marketindex/',
     '코스피': 'https://finance.naver.com/sise/',
+    '코스닥': 'https://finance.naver.com/sise/',
     '비트코인': 'https://upbit.com/exchange?code=CRIX.UPBIT.KRW-BTC',
+    '이더리움': 'https://upbit.com/exchange?code=CRIX.UPBIT.KRW-ETH',
     '날씨': 'https://weather.naver.com/',
+    '자동차보험': 'https://www.knia.or.kr/',
+    '실비보험': 'https://www.klia.or.kr/',
+    '건강보험': 'https://www.nhis.or.kr/',
+    '국민연금': 'https://www.nps.or.kr/',
+    '고용보험': 'https://www.ei.go.kr/',
 };
 
 async function captureScreenshot(url, outputPath, keyword = '') {
@@ -43,6 +50,10 @@ async function captureScreenshot(url, outputPath, keyword = '') {
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
                 '--disable-gpu',
+                '--single-process',
+                '--no-zygote',
+                '--disable-extensions',
+                '--disable-background-networking',
                 '--window-size=1280,800'
             ]
         });
