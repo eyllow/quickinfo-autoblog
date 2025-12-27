@@ -1,6 +1,6 @@
 {
-    "version": 2,
     "$schema": "https://schemas.wp.org/trunk/theme.json",
+    "version": 2,
     "settings": {
         "color": {
             "palette": [
@@ -18,13 +18,28 @@
                     "slug": "accent",
                     "color": "#f59e0b",
                     "name": "Accent Orange"
+                },
+                {
+                    "slug": "background",
+                    "color": "#ffffff",
+                    "name": "White Background"
+                },
+                {
+                    "slug": "foreground",
+                    "color": "#1a1a1a",
+                    "name": "Dark Text"
+                },
+                {
+                    "slug": "light-gray",
+                    "color": "#f8fafc",
+                    "name": "Light Gray"
                 }
             ]
         },
         "typography": {
             "fontFamilies": [
                 {
-                    "fontFamily": "'Noto Sans KR', sans-serif",
+                    "fontFamily": "'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif",
                     "slug": "noto-sans-kr",
                     "name": "Noto Sans KR"
                 }
@@ -32,8 +47,33 @@
         }
     },
     "styles": {
+        "color": {
+            "background": "var(--wp--preset--color--background)",
+            "text": "var(--wp--preset--color--foreground)"
+        },
         "typography": {
-            "fontFamily": "var(--wp--preset--font-family--noto-sans-kr)"
+            "fontFamily": "var(--wp--preset--font-family--noto-sans-kr)",
+            "fontSize": "16px",
+            "lineHeight": "1.8"
+        },
+        "elements": {
+            "link": {
+                "color": {
+                    "text": "var(--wp--preset--color--primary)"
+                }
+            },
+            "heading": {
+                "color": {
+                    "text": "var(--wp--preset--color--foreground)"
+                }
+            }
+        },
+        "blocks": {
+            "core/post-featured-image": {
+                "border": {
+                    "radius": "8px"
+                }
+            }
         }
     }
 }
