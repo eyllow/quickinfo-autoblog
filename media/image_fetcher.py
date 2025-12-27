@@ -15,28 +15,70 @@ from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
-# 한국어 → 영어 키워드 매핑 (자주 사용되는 키워드)
-KEYWORD_TRANSLATIONS = {
-    "연말정산": "tax return",
-    "세금": "tax documents",
-    "주식": "stock market",
-    "투자": "investment finance",
-    "부동산": "real estate",
-    "비트코인": "bitcoin cryptocurrency",
-    "다이어트": "healthy diet food",
-    "운동": "fitness exercise",
-    "건강": "healthy lifestyle",
-    "자동차": "car automobile",
-    "여행": "travel vacation",
-    "맛집": "restaurant food",
-    "아이폰": "iphone smartphone",
-    "갤럭시": "samsung smartphone",
-    "노트북": "laptop computer",
-    "인테리어": "home interior",
-    "요리": "cooking food",
-    "뷰티": "beauty skincare",
-    "패션": "fashion style",
+# 한국어 → 영어 Pexels 검색어 매핑 (다양성을 위해 리스트 사용)
+KEYWORD_TO_PEXELS = {
+    # === 고용/실업 관련 ===
+    "실업급여": ["job interview", "office work", "career search", "business meeting"],
+    "고용보험": ["employment office", "business handshake", "career", "workplace"],
+    "구직": ["job search", "resume writing", "interview", "career planning"],
+    "취업": ["job interview", "office worker", "business professional", "career"],
+    "육아휴직": ["family work balance", "parent working", "home office", "childcare"],
+    "출산휴가": ["maternity", "family", "baby care", "work life balance"],
+
+    # === 연금/보험 관련 ===
+    "국민연금": ["retirement planning", "senior finance", "pension savings", "elderly care"],
+    "건강보험": ["health insurance", "medical document", "healthcare", "hospital"],
+    "의료보험": ["medical insurance", "healthcare", "doctor patient", "hospital"],
+    "자동차보험": ["car insurance", "automobile safety", "driving", "car accident"],
+    "실비보험": ["health insurance", "medical bill", "hospital", "healthcare cost"],
+    "암보험": ["health protection", "medical care", "hospital", "insurance document"],
+    "보험": ["insurance document", "protection shield", "security", "financial safety"],
+
+    # === 세금/금융 관련 ===
+    "연말정산": ["tax document", "calculator finance", "accounting office", "tax return"],
+    "종합소득세": ["tax filing", "financial document", "accounting", "tax calculator"],
+    "부가세": ["business tax", "invoice", "accounting", "financial report"],
+    "양도소득세": ["real estate document", "property tax", "home sale", "tax form"],
+    "증여세": ["gift money", "inheritance", "family finance", "tax planning"],
+    "상속세": ["inheritance document", "family wealth", "estate planning", "legal document"],
+    "세금": ["tax documents", "calculator", "accounting", "financial planning"],
+
+    # === 청년/금융상품 ===
+    "청년도약계좌": ["savings money", "piggy bank", "young professional", "financial planning"],
+    "청년": ["young professional", "student success", "career start", "office worker"],
+    "적금": ["savings account", "money jar", "piggy bank", "financial growth"],
+    "주택청약": ["house keys", "new home", "real estate", "apartment"],
+
+    # === 투자/금융정보 ===
+    "주식": ["stock market chart", "trading", "investment", "finance graph"],
+    "투자": ["investment growth", "financial chart", "money growth", "portfolio"],
+    "부동산": ["real estate", "house property", "apartment building", "home sale"],
+    "비트코인": ["bitcoin cryptocurrency", "digital money", "blockchain", "crypto trading"],
+    "코스피": ["stock exchange", "trading floor", "financial market", "investment"],
+    "환율": ["currency exchange", "money bills", "forex trading", "international finance"],
+
+    # === 라이프스타일 ===
+    "다이어트": ["healthy diet food", "fitness nutrition", "weight loss", "healthy eating"],
+    "운동": ["fitness exercise", "gym workout", "sports", "healthy lifestyle"],
+    "건강": ["healthy lifestyle", "wellness", "fitness", "medical checkup"],
+    "자동차": ["car automobile", "driving", "vehicle", "road trip"],
+    "여행": ["travel vacation", "tourism", "airplane", "adventure"],
+    "맛집": ["restaurant food", "dining", "gourmet", "food photography"],
+
+    # === 테크 ===
+    "아이폰": ["iphone smartphone", "mobile phone", "technology", "app usage"],
+    "갤럭시": ["samsung smartphone", "android phone", "mobile technology", "device"],
+    "노트북": ["laptop computer", "work from home", "technology", "office desk"],
+
+    # === 기타 ===
+    "인테리어": ["home interior", "room design", "furniture", "modern living"],
+    "요리": ["cooking food", "kitchen", "chef", "home cooking"],
+    "뷰티": ["beauty skincare", "cosmetics", "makeup", "self care"],
+    "패션": ["fashion style", "clothing", "outfit", "trendy"],
 }
+
+# 기본 검색어 (매핑 없을 때 사용)
+DEFAULT_PEXELS_QUERIES = ["business office", "professional work", "modern lifestyle", "technology"]
 
 
 class ImageFetcher:
@@ -62,21 +104,26 @@ class ImageFetcher:
 
     def translate_keyword(self, keyword: str) -> str:
         """
-        한국어 키워드를 영어로 변환
+        한국어 키워드를 Pexels 검색어로 변환 (랜덤 선택으로 다양성 확보)
 
         Args:
             keyword: 한국어 키워드
 
         Returns:
-            영어 키워드
+            영어 Pexels 검색어
         """
         # 매핑된 키워드 확인
-        for kr, en in KEYWORD_TRANSLATIONS.items():
-            if kr in keyword:
-                return en
+        for kr_keyword, en_queries in KEYWORD_TO_PEXELS.items():
+            if kr_keyword in keyword:
+                # 랜덤하게 하나 선택 (다양성)
+                selected = random.choice(en_queries)
+                logger.info(f"키워드 변환: '{keyword}' → '{selected}'")
+                return selected
 
-        # 매핑 없으면 일반적인 주제어 반환
-        return "modern lifestyle"
+        # 매핑 없으면 기본 검색어에서 랜덤 선택
+        default = random.choice(DEFAULT_PEXELS_QUERIES)
+        logger.info(f"기본 검색어 사용: '{keyword}' → '{default}'")
+        return default
 
     def search_images(
         self,

@@ -42,12 +42,83 @@ PERSON_KEYWORDS = [
     "김민재", "이강인", "황희찬",
 ]
 
-# 정보성 키워드와 공식 사이트 매핑
+# 정보성 키워드와 공식 사이트 매핑 (확장)
 OFFICIAL_SITES = {
+    # === 고용/실업 관련 ===
+    "실업급여": {
+        "url": "https://www.ei.go.kr/",
+        "name": "고용보험",
+    },
+    "고용보험": {
+        "url": "https://www.ei.go.kr/",
+        "name": "고용보험",
+    },
+    "구직급여": {
+        "url": "https://www.ei.go.kr/",
+        "name": "고용보험",
+    },
+    "육아휴직": {
+        "url": "https://www.ei.go.kr/",
+        "name": "고용보험",
+    },
+    "출산휴가": {
+        "url": "https://www.ei.go.kr/",
+        "name": "고용보험",
+    },
+
+    # === 연금/보험 관련 ===
+    "국민연금": {
+        "url": "https://www.nps.or.kr/",
+        "name": "국민연금공단",
+    },
+    "건강보험": {
+        "url": "https://www.nhis.or.kr/",
+        "name": "국민건강보험공단",
+    },
+    "의료보험": {
+        "url": "https://www.nhis.or.kr/",
+        "name": "국민건강보험공단",
+    },
+    "자동차보험": {
+        "url": "https://www.knia.or.kr/",
+        "name": "손해보험협회",
+    },
+    "실비보험": {
+        "url": "https://www.klia.or.kr/",
+        "name": "생명보험협회",
+    },
+    "암보험": {
+        "url": "https://www.klia.or.kr/",
+        "name": "생명보험협회",
+    },
+
+    # === 세금/금융 관련 ===
     "연말정산": {
         "url": "https://www.hometax.go.kr/",
         "name": "홈택스",
     },
+    "종합소득세": {
+        "url": "https://www.hometax.go.kr/",
+        "name": "홈택스",
+    },
+    "부가세": {
+        "url": "https://www.hometax.go.kr/",
+        "name": "홈택스",
+    },
+    "양도소득세": {
+        "url": "https://www.hometax.go.kr/",
+        "name": "홈택스",
+    },
+    "증여세": {
+        "url": "https://www.hometax.go.kr/",
+        "name": "홈택스",
+    },
+    "상속세": {
+        "url": "https://www.hometax.go.kr/",
+        "name": "홈택스",
+    },
+
+    # === 청년/금융상품 ===
     "청년도약계좌": {
         "url": "https://www.kinfa.or.kr/",
         "name": "서민금융진흥원",
@@ -56,10 +127,34 @@ OFFICIAL_SITES = {
         "url": "https://www.kinfa.or.kr/",
         "name": "서민금융진흥원",
     },
+    "청년내일채움공제": {
+        "url": "https://www.work.go.kr/",
+        "name": "워크넷",
+    },
     "주택청약": {
         "url": "https://www.applyhome.co.kr/",
         "name": "청약홈",
     },
+
+    # === 정부 서비스 ===
+    "정부24": {
+        "url": "https://www.gov.kr/",
+        "name": "정부24",
+    },
+    "주민등록": {
+        "url": "https://www.gov.kr/",
+        "name": "정부24",
+    },
+    "여권": {
+        "url": "https://www.passport.go.kr/",
+        "name": "여권안내",
+    },
+    "운전면허": {
+        "url": "https://www.safedriving.or.kr/",
+        "name": "도로교통공단",
+    },
+
+    # === 투자/금융정보 ===
     "환율": {
         "url": "https://finance.naver.com/marketindex/",
         "name": "네이버 금융",
@@ -80,29 +175,11 @@ OFFICIAL_SITES = {
         "url": "https://upbit.com/exchange?code=CRIX.UPBIT.KRW-ETH",
         "name": "업비트",
     },
+
+    # === 기타 ===
     "날씨": {
         "url": "https://weather.naver.com/",
         "name": "네이버 날씨",
-    },
-    "자동차보험": {
-        "url": "https://www.knia.or.kr/",
-        "name": "손해보험협회",
-    },
-    "실비보험": {
-        "url": "https://www.klia.or.kr/",
-        "name": "생명보험협회",
-    },
-    "건강보험": {
-        "url": "https://www.nhis.or.kr/",
-        "name": "국민건강보험공단",
-    },
-    "국민연금": {
-        "url": "https://www.nps.or.kr/",
-        "name": "국민연금공단",
-    },
-    "고용보험": {
-        "url": "https://www.ei.go.kr/",
-        "name": "고용보험",
     },
 }
 
@@ -276,55 +353,38 @@ class ScreenshotCapture:
 
     def capture_with_fallback(self, keyword: str, retry: int = 2) -> Optional[Dict]:
         """
-        여러 URL로 스크린샷 시도 (fallback 포함)
+        공식 사이트 우선 스크린샷 캡처 (뉴스 검색 사용 안 함)
 
         Args:
             keyword: 키워드
-            retry: 각 URL당 재시도 횟수
+            retry: 재시도 횟수
 
         Returns:
             스크린샷 정보 또는 None
         """
-        # 시도할 URL 목록 생성
-        urls_to_try = []
-
-        # 1. 공식 사이트가 있으면 우선 시도
+        # 공식 사이트 찾기
         site_info = self.get_official_site(keyword)
-        if site_info:
-            urls_to_try.append({
-                "url": site_info["url"],
-                "source": site_info["name"],
-                "is_person": False
-            })
 
-        # 2. 네이버 뉴스 검색
-        urls_to_try.append({
-            "url": f"https://search.naver.com/search.naver?where=news&query={keyword}",
-            "source": "네이버 뉴스",
-            "is_person": True
-        })
+        if not site_info:
+            logger.warning(f"공식 사이트를 찾을 수 없음: {keyword} (스크린샷 건너뜀)")
+            return None
 
-        # 3. 다음 뉴스 검색 (백업)
-        urls_to_try.append({
-            "url": f"https://search.daum.net/search?w=news&q={keyword}",
-            "source": "다음 뉴스",
-            "is_person": True
-        })
+        logger.info(f"공식 사이트 스크린샷: {site_info['name']} ({site_info['url']})")
 
-        for url_info in urls_to_try:
-            for attempt in range(retry):
-                logger.info(f"스크린샷 시도: {url_info['source']} (시도 {attempt+1}/{retry})")
-                result = self.capture(
-                    keyword,
-                    url=url_info["url"],
-                    is_person=url_info["is_person"]
-                )
-                if result:
-                    result["source"] = url_info["source"]
-                    return result
-                time.sleep(1)  # 재시도 전 대기
+        # 재시도 로직
+        for attempt in range(retry):
+            logger.info(f"스크린샷 시도: {site_info['name']} (시도 {attempt+1}/{retry})")
+            result = self.capture(
+                keyword,
+                url=site_info["url"],
+                is_person=False
+            )
+            if result:
+                result["source"] = site_info["name"]
+                return result
+            time.sleep(1)  # 재시도 전 대기
 
-        logger.error(f"모든 스크린샷 시도 실패: {keyword}")
+        logger.error(f"스크린샷 캡처 실패: {keyword}")
         return None
 
 

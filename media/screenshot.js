@@ -42,7 +42,7 @@ async function captureScreenshot(url, outputPath, keyword = '') {
     let browser;
 
     try {
-        // 브라우저 실행
+        // 브라우저 실행 (한글 설정 포함)
         browser = await puppeteer.launch({
             headless: 'new',
             args: [
@@ -54,7 +54,9 @@ async function captureScreenshot(url, outputPath, keyword = '') {
                 '--no-zygote',
                 '--disable-extensions',
                 '--disable-background-networking',
-                '--window-size=1280,800'
+                '--window-size=1280,800',
+                '--font-render-hinting=none',
+                '--lang=ko-KR'
             ]
         });
 
@@ -71,6 +73,11 @@ async function captureScreenshot(url, outputPath, keyword = '') {
         await page.setUserAgent(
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         );
+
+        // 한국어 Accept-Language 헤더 설정
+        await page.setExtraHTTPHeaders({
+            'Accept-Language': 'ko-KR,ko;q=0.9'
+        });
 
         // 페이지 로드
         console.error(`Loading: ${url}`);
