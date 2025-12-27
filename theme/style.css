@@ -1,0 +1,47 @@
+/*
+Theme Name: QuickInfo Theme
+Theme URI: https://quickinfo.kr
+Description: QuickInfo 맞춤형 테마
+Author: QuickInfo
+Author URI: https://quickinfo.kr
+Template: twentytwentyfive
+Version: 1.0.0
+Text Domain: quickinfo-theme
+*/
+
+/* 커스텀 스타일 */
+.wp-site-blocks {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* 푸터 스타일 */
+.wp-block-template-part.site-footer {
+    background-color: #1a1a1a;
+    color: #ffffff;
+    padding: 40px 20px;
+}
+
+.footer-menu {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    list-style: none;
+    padding: 0;
+    margin: 0 0 20px 0;
+}
+
+.footer-menu a {
+    color: #ffffff;
+    text-decoration: none;
+}
+
+.footer-menu a:hover {
+    text-decoration: underline;
+}
+
+.footer-copyright {
+    text-align: center;
+    color: #888888;
+    font-size: 14px;
+}

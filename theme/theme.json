@@ -1,0 +1,39 @@
+{
+    "version": 2,
+    "$schema": "https://schemas.wp.org/trunk/theme.json",
+    "settings": {
+        "color": {
+            "palette": [
+                {
+                    "slug": "primary",
+                    "color": "#2563eb",
+                    "name": "Primary Blue"
+                },
+                {
+                    "slug": "secondary",
+                    "color": "#1e293b",
+                    "name": "Dark Gray"
+                },
+                {
+                    "slug": "accent",
+                    "color": "#f59e0b",
+                    "name": "Accent Orange"
+                }
+            ]
+        },
+        "typography": {
+            "fontFamilies": [
+                {
+                    "fontFamily": "'Noto Sans KR', sans-serif",
+                    "slug": "noto-sans-kr",
+                    "name": "Noto Sans KR"
+                }
+            ]
+        }
+    },
+    "styles": {
+        "typography": {
+            "fontFamily": "var(--wp--preset--font-family--noto-sans-kr)"
+        }
+    }
+}
