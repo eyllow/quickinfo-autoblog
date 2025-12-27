@@ -154,7 +154,7 @@ class ContentGenerator:
 
     def _parse_image_types(self, content: str) -> List[str]:
         """
-        AI가 지정한 이미지 타입 파싱
+        AI가 지정한 이미지 타입 파싱 (폴백 강화)
 
         Args:
             content: 생성된 콘텐츠
@@ -165,13 +165,26 @@ class ContentGenerator:
         pattern = r'\[IMAGE_TYPE:(SCREENSHOT|PEXELS)\]'
         matches = re.findall(pattern, content)
 
-        # 매치가 없으면 기본값 (모두 PEXELS)
-        if not matches:
-            # [IMAGE_N] 태그 개수 확인
-            image_tags = re.findall(r'\[IMAGE_\d+\]', content)
-            return ["PEXELS"] * len(image_tags)
+        # [IMAGE_N] 태그 개수 확인
+        image_tags = re.findall(r'\[IMAGE_\d+\]', content)
+        image_count = len(image_tags)
 
-        return matches
+        # 매치가 없거나 부족하면 기본값(PEXELS)으로 채움
+        if not matches:
+            logger.warning(f"IMAGE_TYPE 태그 없음, 기본값 PEXELS {max(image_count, 2)}개 사용")
+            return ["PEXELS"] * max(image_count, 2)  # 최소 2개
+
+        # 매치 개수가 이미지 태그보다 적으면 PEXELS로 채움
+        if len(matches) < image_count:
+            logger.info(f"IMAGE_TYPE {len(matches)}개, IMAGE 태그 {image_count}개 - PEXELS로 보충")
+            matches.extend(["PEXELS"] * (image_count - len(matches)))
+
+        # 이미지 타입이 있지만 IMAGE 태그가 없으면 최소 2개 반환
+        if image_count == 0 and matches:
+            return matches[:2] if len(matches) >= 2 else matches + ["PEXELS"] * (2 - len(matches))
+
+        # 최종 폴백: 아무것도 없으면 PEXELS 2개
+        return matches if matches else ["PEXELS", "PEXELS"]
 
     def _expand_content(self, content: str, keyword: str, target_length: int) -> str:
         """

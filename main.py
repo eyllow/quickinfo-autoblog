@@ -138,11 +138,18 @@ def run_auto_publish(
 
         # 5. 이미지 삽입 (AI 판단에 따라 스크린샷 또는 Pexels 이미지 사용)
         logger.info("이미지 삽입 중...")
-        logger.info(f"이미지 타입: {post.image_types}")
+
+        # 이미지 타입이 비어있으면 기본값 설정
+        image_types = post.image_types
+        if not image_types or image_types == []:
+            logger.warning("이미지 타입 없음, 기본값 PEXELS 2개 사용")
+            image_types = ["PEXELS", "PEXELS"]
+
+        logger.info(f"이미지 타입: {image_types}")
         content_with_images, featured_image_id = publisher.insert_images_to_content(
             content=post.content,
             keyword=selected_keyword,
-            image_types=post.image_types,
+            image_types=image_types,
             count=5
         )
         post.content = content_with_images
