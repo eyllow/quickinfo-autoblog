@@ -159,7 +159,15 @@ def process_keyword(
         logger.info(f"  - Length: {len(post.content)} characters")
         logger.info(f"  - Category: {post.category}")
         logger.info(f"  - Has Coupang: {post.has_coupang}")
+        logger.info(f"  - Web Sources: {len(post.sources)}")
         logger.info(f"  - Excerpt: {post.excerpt[:50]}..." if post.excerpt else "  - Excerpt: (none)")
+
+        # 웹검색 출처 표시
+        if post.sources:
+            logger.info("  - Sources used:")
+            for src in post.sources[:5]:
+                logger.info(f"      * {src['title'][:50]}...")
+                logger.info(f"        {src['url']}")
 
         if dry_run:
             logger.info("=== DRY RUN MODE ===")

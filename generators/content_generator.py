@@ -8,16 +8,56 @@ from pathlib import Path
 
 import anthropic
 
+# AI 메타 응답 제거 패턴
+AI_META_PATTERNS = [
+    r"^.*?제공해주신.*?작성하겠습니다\.?\s*",
+    r"^.*?가이드라인.*?따라.*?작성.*?\s*",
+    r"^.*?HTML 문서를 작성.*?\s*",
+    r"^.*?아래.*?구조로.*?작성.*?\s*",
+    r"^.*?말씀하신.*?대로.*?\s*",
+    r"^.*?요청하신.*?내용.*?\s*",
+    r"^.*?블로그 글을 작성해.*?\s*",
+    r"^.*?다음과 같이.*?작성.*?\s*",
+]
+
+
+def clean_ai_response(content: str) -> str:
+    """
+    AI 메타 응답 제거
+
+    Args:
+        content: AI가 생성한 콘텐츠
+
+    Returns:
+        정리된 콘텐츠
+    """
+    # 메타 패턴 제거
+    for pattern in AI_META_PATTERNS:
+        content = re.sub(pattern, "", content, flags=re.DOTALL | re.MULTILINE)
+
+    # HTML 태그로 시작하도록 정리
+    # <div, <h2, <p 등으로 시작하는 부분 찾기
+    html_start = re.search(r'<(?:div|h[1-6]|p|section)', content, re.IGNORECASE)
+    if html_start:
+        content = content[html_start.start():]
+
+    # 앞뒤 공백 정리
+    content = content.strip()
+
+    return content
+
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config.settings import settings
 from utils.image_fetcher import ImageFetcher
 from utils.google_sheets import get_coupang_products
 from utils.product_matcher import match_products_for_content, generate_product_html
+from utils.web_search import GoogleSearcher
+from utils.humanizer import humanize_full
 from .prompts import (
     SYSTEM_PROMPT,
     STRUCTURE_PROMPT,
-    TITLE_PROMPT,
+    get_title_prompt,
     CATEGORY_TEMPLATES,
     get_template,
     OFFICIAL_BUTTON_TEMPLATE,
@@ -25,13 +65,26 @@ from .prompts import (
     COUPANG_DISCLAIMER,
     HEALTH_DISCLAIMER,
     AFFILIATE_NOTICE,
-    CATEGORY_BADGE_TEMPLATE
+    CATEGORY_BADGE_TEMPLATE,
+    HUMAN_PERSONA_PROMPT
 )
+from .template_prompts import generate_template_prompt, get_template_info_log
 
 logger = logging.getLogger(__name__)
 
 # 설정 파일 경로
 CONFIG_DIR = Path(settings.config_dir)
+
+# 쿠팡 제외 키워드 (금융/투자 관련 - 카테고리 설정과 무관하게 항상 제외)
+COUPANG_EXCLUDE_KEYWORDS = [
+    "비트코인", "이더리움", "코인", "암호화폐", "가상화폐", "블록체인",
+    "주식", "투자", "펀드", "ETF", "배당", "증권",
+    "대출", "금리", "환율", "외환",
+    "연말정산", "세금", "환급",
+]
+
+# 쿠팡 제외 카테고리
+COUPANG_EXCLUDE_CATEGORIES = ["연예", "트렌드", "재테크", "취업교육"]
 
 
 @dataclass
@@ -43,6 +96,11 @@ class GeneratedPost:
     category: str
     template: str
     has_coupang: bool = False
+    sources: list = None  # 웹검색 출처 목록
+
+    def __post_init__(self):
+        if self.sources is None:
+            self.sources = []
 
 
 class ContentGenerator:
@@ -53,12 +111,14 @@ class ContentGenerator:
         self.model = settings.claude_model
         self.coupang_id = settings.coupang_partner_id
         self.image_fetcher = ImageFetcher()
+        self.web_searcher = GoogleSearcher()
 
         # 설정 파일 로드
         self.categories_config = self._load_json("categories.json")
         self.official_links = self._load_json("official_links.json")
         self.coupang_links = self._load_json("coupang_links.json")
         self.coupang_defaults = self._load_json("coupang_defaults.json")
+        self.evergreen_config = self._load_json("evergreen_keywords.json")
 
     def _load_json(self, filename: str) -> dict:
         """JSON 설정 파일 로드"""
@@ -73,18 +133,55 @@ class ContentGenerator:
             logger.error(f"Error parsing {filename}: {e}")
             return {}
 
+    def is_evergreen_keyword(self, keyword: str) -> bool:
+        """
+        에버그린 키워드인지 확인
+
+        Args:
+            keyword: 검사할 키워드
+
+        Returns:
+            에버그린 키워드 여부
+        """
+        detection_keywords = self.evergreen_config.get("detection_keywords", [])
+
+        for eg_keyword in detection_keywords:
+            if eg_keyword.lower() in keyword.lower():
+                logger.info(f"Evergreen keyword detected: '{keyword}' matches '{eg_keyword}'")
+                return True
+
+        return False
+
     def _call_claude(
         self,
         user_prompt: str,
         system_prompt: str = SYSTEM_PROMPT,
-        max_tokens: int = 8000
+        max_tokens: int = 8000,
+        use_persona: bool = True
     ) -> str:
-        """Claude API 호출"""
+        """
+        Claude API 호출
+
+        Args:
+            user_prompt: 사용자 프롬프트
+            system_prompt: 시스템 프롬프트
+            max_tokens: 최대 토큰 수
+            use_persona: 인간 페르소나 프롬프트 사용 여부
+
+        Returns:
+            Claude 응답 텍스트
+        """
         try:
+            # 인간 페르소나 프롬프트 추가 (AI 탐지 회피용)
+            if use_persona:
+                full_system_prompt = HUMAN_PERSONA_PROMPT + "\n\n" + system_prompt
+            else:
+                full_system_prompt = system_prompt
+
             message = self.client.messages.create(
                 model=self.model,
                 max_tokens=max_tokens,
-                system=system_prompt,
+                system=full_system_prompt,
                 messages=[
                     {"role": "user", "content": user_prompt}
                 ]
@@ -129,42 +226,124 @@ class ContentGenerator:
         return best_match, best_config
 
     def generate_title(self, keyword: str) -> str:
-        """블로그 제목 생성"""
-        prompt = TITLE_PROMPT.format(keyword=keyword)
-        title = self._call_claude(prompt, max_tokens=200)
+        """블로그 제목 생성 (현재 연도 동적 반영)"""
+        prompt = get_title_prompt(keyword)
+        # 제목 생성에는 페르소나 미사용
+        title = self._call_claude(prompt, max_tokens=200, use_persona=False)
         return title.strip().strip('"\'')
+
+    def perform_web_search(self, keyword: str) -> dict:
+        """
+        트렌드 키워드에 대해 웹검색 수행
+
+        Args:
+            keyword: 검색 키워드
+
+        Returns:
+            웹검색 결과 딕셔너리
+        """
+        if not self.web_searcher.is_configured():
+            logger.warning("Google Search API not configured - skipping web search")
+            return {"keyword": keyword, "sources": [], "content": ""}
+
+        logger.info(f"Performing web search for: {keyword}")
+        result = self.web_searcher.search_and_crawl(keyword, num_results=5)
+
+        if result.get("sources"):
+            logger.info(f"  Found {len(result['sources'])} sources")
+            for src in result['sources'][:3]:
+                logger.info(f"    - {src['title'][:40]}...")
+        else:
+            logger.warning(f"  No web search results found")
+
+        return result
 
     def generate_content_with_template(
         self,
         keyword: str,
         news_data: str,
-        template_name: str
-    ) -> str:
+        template_name: str,
+        category_name: str = "트렌드",
+        is_evergreen: bool = False,
+        web_data: dict = None
+    ) -> tuple[str, list, dict]:
         """
-        카테고리별 템플릿으로 본문 생성
+        템플릿 다양화 시스템으로 본문 생성 (저품질 방지)
 
         Args:
             keyword: 키워드
             news_data: 뉴스 데이터
-            template_name: 템플릿 이름 (finance, product, celebrity 등)
+            template_name: 기존 템플릿 이름 (호환용, 실제 사용 안 함)
+            category_name: 카테고리명
+            is_evergreen: 에버그린 콘텐츠 여부
+            web_data: 웹검색 결과 (트렌드 키워드용)
 
         Returns:
-            HTML 본문
+            (HTML 본문, 출처 목록, 템플릿 정보) 튜플
         """
-        template = get_template(template_name)
+        # 웹검색 결과가 있으면 참고 자료로 추가
+        sources = []
+        web_data_content = ""
 
-        prompt = template.format(
+        if web_data and web_data.get("content"):
+            web_content = web_data["content"][:6000]  # 토큰 제한 고려
+            sources = web_data.get("sources", [])
+
+            web_data_content = f"""
+[웹검색 결과 - 최신 정보 (반드시 이 내용을 바탕으로 작성)]
+{web_content}
+
+[기존 뉴스 데이터]
+{news_data}
+
+[중요 규칙]
+1. 위 참고 자료의 팩트만 사용하세요
+2. 자료에 없는 내용은 추측하지 마세요
+3. 최신 날짜, 금액, 수치를 정확히 반영하세요
+"""
+            logger.info(f"Added web search data: {len(web_content)} chars from {len(sources)} sources")
+        elif news_data:
+            web_data_content = news_data
+
+        # 🆕 템플릿 다양화 시스템 사용 (저품질 방지)
+        prompt, template_key, template, cta_config = generate_template_prompt(
             keyword=keyword,
-            news_data=news_data
+            category=category_name,
+            web_data=web_data_content,
+            is_evergreen=is_evergreen
         )
 
-        content = self._call_claude(prompt, max_tokens=8000)
+        # 템플릿 정보 로깅
+        template_info = get_template_info_log(template_key, template, cta_config)
+        print(template_info)
+        logger.info(f"Template selected: {template_key} ({template['name']})")
+        logger.info(f"Target words: {template['selected_word_count']}, Images: {template['selected_image_count']}")
+
+        # 모델 제한 내에서 최대치 사용 (Haiku: 8192)
+        max_tokens = 8000
+
+        content = self._call_claude(prompt, max_tokens=max_tokens)
 
         # HTML 코드 블록 제거
         content = re.sub(r'^```html\s*', '', content, flags=re.MULTILINE)
         content = re.sub(r'\s*```$', '', content, flags=re.MULTILINE)
 
-        return content.strip()
+        # AI 메타 응답 제거
+        content = clean_ai_response(content)
+
+        # 인간화 처리 (AI 탐지 회피)
+        content = humanize_full(content, keyword)
+
+        # 템플릿 정보 딕셔너리 반환
+        template_info_dict = {
+            "key": template_key,
+            "name": template["name"],
+            "word_count": template["selected_word_count"],
+            "image_count": template["selected_image_count"],
+            "cta_position": cta_config["position"]
+        }
+
+        return content.strip(), sources, template_info_dict
 
     def _extract_meta_description(self, content: str) -> str:
         """메타 설명 추출"""
@@ -192,49 +371,118 @@ class ContentGenerator:
                     }
         return None
 
+    def should_exclude_coupang(self, keyword: str, category_name: str) -> bool:
+        """
+        쿠팡 배너 제외 여부 판단
+
+        Args:
+            keyword: 키워드
+            category_name: 카테고리명
+
+        Returns:
+            True면 쿠팡 제외
+        """
+        # 1. 카테고리 기반 제외
+        if category_name in COUPANG_EXCLUDE_CATEGORIES:
+            logger.info(f"Coupang excluded: category '{category_name}' in exclude list")
+            return True
+
+        # 2. 키워드 기반 제외 (금융/투자 관련)
+        keyword_lower = keyword.lower()
+        for exclude_kw in COUPANG_EXCLUDE_KEYWORDS:
+            if exclude_kw.lower() in keyword_lower:
+                logger.info(f"Coupang excluded: keyword '{exclude_kw}' found in '{keyword}'")
+                return True
+
+        return False
+
     def insert_images(
         self,
         content: str,
         keyword: str,
-        category_name: str
+        category_name: str,
+        count: int = 4,
+        use_mixed: bool = True
     ) -> str:
         """
-        [IMAGE_N] 태그를 실제 이미지로 교체
+        혼합 이미지 시스템으로 [IMAGE_N] 태그를 실제 이미지로 교체
+
+        Phase 3: Puppeteer 스크린샷 + Pexels 혼합
+
+        1. 스크린샷 조건 충족 시 첫 이미지를 스크린샷으로
+        2. 나머지는 AI 기반 Pexels 검색
 
         Args:
             content: HTML 본문
             keyword: 키워드
             category_name: 카테고리 이름
+            count: 필요한 이미지 개수
+            use_mixed: 혼합 이미지 시스템 사용 여부
 
         Returns:
             이미지가 삽입된 HTML
         """
-        # 카테고리에 맞는 이미지 검색
-        images = self.image_fetcher.search_images_for_category(
-            keyword=keyword,
-            category_name=category_name,
-            count=4
-        )
+        # 혼합 이미지 시스템 사용 (Phase 3)
+        if use_mixed:
+            images = self.image_fetcher.fetch_mixed_images(
+                content, keyword, category_name, count
+            )
+        else:
+            # 폴백: 기존 AI 기반 Pexels만 사용
+            images = self.image_fetcher.fetch_contextual_images(content, keyword)
 
         if not images:
             logger.warning(f"No images found for {keyword}")
-            # 이미지 태그 제거
-            for i in range(1, 5):
-                content = content.replace(f"[IMAGE_{i}]", "")
+            # 이미지 태그 및 IMG_CONTEXT 주석 제거 (확장 패턴: 콜론 포함)
+            content = re.sub(r'<!-- IMG_CONTEXT: .+? -->\s*', '', content)
+            content = re.sub(r'\[IMAGE_\d+[^\]]*\]', '', content)  # [IMAGE_N: 설명] 포함
             return content
 
-        # 이미지 태그 교체
-        for i, img in enumerate(images, 1):
-            tag = f"[IMAGE_{i}]"
-            if tag in content:
-                img_html = self.image_fetcher.generate_image_html(
-                    img, keyword, f"{keyword} 관련 이미지 {i}"
-                )
-                content = content.replace(tag, img_html)
+        # 각 이미지 태그를 실제 이미지로 교체
+        for tag, img_data in images.items():
+            # URL 유효성 확인
+            if not img_data.get('url') or not img_data['url'].startswith('http'):
+                logger.warning(f"Invalid image URL for {tag}: {img_data.get('url')}")
+                continue
 
-        # 남은 태그 제거
-        for i in range(1, 5):
-            content = content.replace(f"[IMAGE_{i}]", "")
+            # 스크린샷인 경우 다른 캡션 사용
+            if img_data.get('type') == 'screenshot':
+                caption = f"{img_data['alt']} (실시간 캡쳐)"
+            else:
+                caption = f"{img_data['alt']} (Photo by {img_data['photographer']} on Pexels)"
+
+            img_html = f'''
+<figure style="text-align: center; margin: 30px 0;">
+    <img src="{img_data['url']}"
+         alt="{img_data['alt']}"
+         style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);"
+         loading="lazy" />
+    <figcaption style="margin-top: 10px; color: #666; font-size: 14px;">
+        {caption}
+    </figcaption>
+</figure>
+'''
+            # tag에서 숫자 추출 (IMAGE_1 -> 1)
+            tag_num = tag.replace("IMAGE_", "")
+
+            # 패턴 1: IMG_CONTEXT 주석 + 이미지 태그 (콜론 포함)
+            pattern1 = rf'<!-- IMG_CONTEXT: .+? -->\s*\[IMAGE_{tag_num}[^\]]*\]'
+
+            # 패턴 2: 이미지 태그만 (콜론 포함) - [IMAGE_1: 설명] 또는 [IMAGE_1]
+            pattern2 = rf'\[IMAGE_{tag_num}[^\]]*\]'
+
+            if re.search(pattern1, content):
+                content = re.sub(pattern1, img_html, content, count=1)
+                logger.info(f"Inserted {tag} (with context): {img_data['search_query']}")
+            elif re.search(pattern2, content):
+                content = re.sub(pattern2, img_html, content, count=1)
+                logger.info(f"Inserted {tag} (tag only): {img_data['search_query']}")
+            else:
+                logger.warning(f"Tag {tag} not found in content")
+
+        # 남은 IMG_CONTEXT 주석 및 이미지 태그 제거 (확장 패턴)
+        content = re.sub(r'<!-- IMG_CONTEXT: .+? -->\s*', '', content)
+        content = re.sub(r'\[IMAGE_\d+[^\]]*\]', '', content)  # [IMAGE_N: 설명] 포함
 
         return content
 
@@ -265,15 +513,32 @@ class ContentGenerator:
 
         핵심 로직: 쿠팡 배너가 있을 때만 파트너스 문구 삽입
         """
-        # 태그 제거
+        # 태그 제거 (열기/닫기 모두)
         content = content.replace("[AFFILIATE_NOTICE]", "")
+        content = content.replace("[/AFFILIATE_NOTICE]", "")
 
-        # 쿠팡 배너가 있고, 아직 문구가 없을 때만 추가
-        if has_coupang and "쿠팡 파트너스 활동" not in content:
-            content += AFFILIATE_NOTICE
-            logger.info("Affiliate notice inserted (coupang exists)")
-        elif not has_coupang:
-            logger.info("Affiliate notice skipped (no coupang)")
+        if has_coupang:
+            # 쿠팡 배너가 있고, 아직 문구가 없을 때만 추가
+            if "쿠팡 파트너스 활동" not in content:
+                content += AFFILIATE_NOTICE
+                logger.info("Affiliate notice inserted (coupang exists)")
+        else:
+            # 쿠팡 배너가 없으면 Claude가 자체 생성한 파트너스 문구도 제거
+            patterns_to_remove = [
+                r'<p[^>]*>.*?이 포스팅은 파트너십 및 광고 포함 콘텐츠.*?</p>',
+                r'<p[^>]*>.*?이 포스팅은 제휴 마케팅 활동의 일환으로.*?</p>',
+                r'<p[^>]*>.*?이 포스팅은 쿠팡 파트너스 활동의 일환으로.*?</p>',
+                r'<p[^>]*>.*?파트너십 링크가 포함되어 있을 수 있.*?</p>',
+                r'<p[^>]*>.*?이 글에는 제휴 링크가 포함.*?</p>',
+                r'이 포스팅은 파트너십 및 광고 포함 콘텐츠이에요\.?',
+                r'이 포스팅은 제휴 마케팅 활동의 일환으로.*?작성되었어요\.?',
+                r': 이 글에는 파트너십 링크가 포함되어 있을 수 있어요\.?',
+            ]
+
+            for pattern in patterns_to_remove:
+                content = re.sub(pattern, '', content, flags=re.IGNORECASE | re.DOTALL)
+
+            logger.info("Affiliate notice skipped and cleaned (no coupang)")
 
         return content
 
@@ -304,6 +569,11 @@ class ContentGenerator:
         """
         [COUPANG] 태그를 쿠팡 상품으로 교체
 
+        제외 조건 (우선 적용):
+        - 카테고리: 연예, 트렌드, 재테크, 취업교육
+        - 키워드: 비트코인, 주식, 투자 등 금융 관련
+
+        삽입 순서:
         1순위: 구글 시트 상품 DB에서 매칭
         2순위: JSON 기반 쿠팡 링크 (키워드 매칭)
         3순위: 카테고리별 기본 링크 (coupang_defaults.json)
@@ -317,10 +587,26 @@ class ContentGenerator:
         Returns:
             (수정된 콘텐츠, 쿠팡 삽입 여부) 튜플
         """
-        # 쿠팡이 필요없는 카테고리면 태그만 제거
+        # 쿠팡 제외 조건 확인 (카테고리 + 키워드 기반) - 가장 먼저 체크
+        if self.should_exclude_coupang(keyword, category_name):
+            content = content.replace("[COUPANG]", "")
+            return content, False
+
+        # 쿠팡이 필요없는 카테고리면 태그만 제거 (기존 설정 호환)
         if not category_config.get("requires_coupang", False):
             content = content.replace("[COUPANG]", "")
             return content, False
+
+        # 쿠팡이 필요한 카테고리인데 [COUPANG] 태그가 없으면 콘텐츠 끝에 추가
+        if "[COUPANG]" not in content:
+            logger.info("Adding [COUPANG] tag for coupang-required category")
+            # 마무리 섹션 앞에 추가 시도
+            if "</div>" in content:
+                # 마지막 </div> 앞에 삽입
+                last_div = content.rfind("</div>")
+                content = content[:last_div] + "\n[COUPANG]\n" + content[last_div:]
+            else:
+                content += "\n[COUPANG]\n"
 
         # 1순위: 구글 시트 상품 DB
         try:
@@ -376,8 +662,11 @@ class ContentGenerator:
         content = re.sub(r'\[OFFICIAL_LINK\]', '', content)
         content = re.sub(r'\[COUPANG\]', '', content)
         content = re.sub(r'\[DISCLAIMER\]', '', content)
-        content = re.sub(r'\[AFFILIATE_NOTICE\]', '', content)
-        content = re.sub(r'\[IMAGE_\d\]', '', content)
+        content = re.sub(r'\[/?AFFILIATE_NOTICE\]', '', content)  # 열기/닫기 태그 모두 제거
+        content = re.sub(r'\[IMAGE_\d+[^\]]*\]', '', content)  # [IMAGE_N: 설명] 포함
+
+        # IMG_CONTEXT 주석 제거 (혹시 남아있는 경우)
+        content = re.sub(r'<!-- IMG_CONTEXT: .+? -->\s*', '', content)
 
         return content.strip()
 
@@ -396,72 +685,126 @@ class ContentGenerator:
         Returns:
             GeneratedPost 객체
         """
-        logger.info(f"=" * 50)
-        logger.info(f"Generating post for: {keyword}")
+        print("\n" + "=" * 60)
+        print("📝 블로그 글 생성 프로세스 시작")
+        print("=" * 60)
 
-        # 1. 카테고리 분류
-        logger.info("Step 1: Classifying category...")
+        # Step 1: 키워드 분석 및 카테고리 분류
+        print(f"\n[Step 1/7] 키워드 분석")
+        print(f"  └─ 키워드: {keyword}")
         category_name, category_config = self.classify_category(keyword)
         template_name = category_config.get("template", "trend")
-        logger.info(f"  Category: {category_name}, Template: {template_name}")
+        is_evergreen = self.is_evergreen_keyword(keyword)
+        print(f"  └─ 에버그린: {'✅ Yes' if is_evergreen else '❌ No'}")
+        print(f"  └─ 카테고리: {category_name}")
+        print(f"  └─ 템플릿: {template_name}")
 
-        # 2. 제목 생성
-        logger.info("Step 2: Generating title...")
+        # Step 2: 웹검색 (트렌드 + 에버그린 카테고리 모두 적용)
+        print(f"\n[Step 2/7] 웹검색 실행")
+
+        # 웹 검색 적용 카테고리 (트렌드 + 에버그린)
+        web_search_categories = ["트렌드", "연예", "생활정보", "재테크", "건강", "IT/테크", "취업교육"]
+
+        if category_name in web_search_categories:
+            print(f"  🔍 웹 검색 수행: {keyword} (카테고리: {category_name})")
+            web_data = self.perform_web_search(keyword)
+
+            if web_data and web_data.get("content"):
+                print(f"  ✅ 웹 검색 정보 취합 완료 ({len(web_data.get('content', ''))}자)")
+            else:
+                print(f"  ⚠️ 웹 검색 결과 없음, AI 기본 지식으로 작성")
+        else:
+            print(f"  ℹ️ 웹 검색 스킵 (카테고리: {category_name})")
+            web_data = {"sources": [], "content": ""}
+
+        sources = web_data.get("sources", []) if web_data else []
+        if sources:
+            print(f"  └─ 검색 결과: {len(sources)}개 출처")
+            for src in sources[:3]:
+                print(f"      • {src['title'][:40]}...")
+        elif category_name in web_search_categories:
+            print(f"  └─ 검색 결과: 없음")
+
+        # Step 3: 제목 생성
+        print(f"\n[Step 3/7] 제목 생성")
+        print(f"  └─ Claude API 호출 중...")
         title = self.generate_title(keyword)
-        logger.info(f"  Title: {title}")
+        print(f"  └─ 생성된 제목: {title}")
 
-        # 3. 본문 생성 (카테고리별 템플릿)
-        logger.info(f"Step 3: Generating content with '{template_name}' template...")
-        content = self.generate_content_with_template(keyword, news_data, template_name)
-        logger.info(f"  Raw content length: {len(content)} chars")
+        # Step 4: 본문 생성 (템플릿 다양화 시스템)
+        print(f"\n[Step 4/7] 본문 생성 (템플릿 다양화)")
+        print(f"  └─ 에버그린: {'✅ Yes' if is_evergreen else '❌ No'}")
+        print(f"  └─ Claude API 호출 중...")
+        content, content_sources, template_info = self.generate_content_with_template(
+            keyword, news_data, template_name,
+            category_name=category_name,
+            is_evergreen=is_evergreen,
+            web_data=web_data
+        )
+        print(f"  └─ 생성 완료: {len(content)} chars")
+        print(f"  └─ 사용된 템플릿: {template_info['name']} ({template_info['key']})")
+        print(f"  └─ 목표 글자수: {template_info['word_count']}자, 이미지: {template_info['image_count']}개")
+        sources = content_sources if content_sources else sources
 
-        # 4. 메타 설명 추출
+        # Step 5: 메타 설명 추출
         excerpt = self._extract_meta_description(content)
         if not excerpt:
             excerpt = f"{keyword}에 대한 완벽 가이드! 핵심 정보부터 실전 팁까지 한 번에 알아보세요."[:160]
 
-        # 5. 이미지 삽입
-        logger.info("Step 4: Inserting images...")
-        content = self.insert_images(content, keyword, category_name)
+        # Step 6: 후처리 (이미지, 링크, 쿠팡)
+        print(f"\n[Step 5/7] 후처리")
 
-        # 6. 공식 사이트 링크 삽입 (필요시)
+        # 이미지 삽입 (템플릿에서 지정한 이미지 개수 사용)
+        image_count = template_info.get('image_count', 4)
+        content = self.insert_images(content, keyword, category_name, image_count)
+        print(f"  └─ 이미지 삽입 완료")
+
+        # 공식 사이트 링크 삽입
         if category_config.get("requires_official_link", False):
-            logger.info("Step 5: Inserting official link...")
             content = self.insert_official_link(content, keyword)
+            print(f"  └─ 공식 링크 삽입 완료")
         else:
             content = content.replace("[OFFICIAL_LINK]", "")
 
-        # 7. 건강 면책문구 삽입 (필요시)
+        # 건강 면책문구 삽입
         if category_config.get("requires_disclaimer", False):
-            logger.info("Step 6: Inserting health disclaimer...")
             content = self.insert_disclaimer(content)
+            print(f"  └─ 건강 면책문구 삽입 완료")
         else:
             content = content.replace("[DISCLAIMER]", "")
 
-        # 8. 쿠팡 상품 삽입
-        logger.info("Step 7: Inserting coupang products...")
+        # Step 7: 쿠팡 처리
+        print(f"\n[Step 6/7] 쿠팡 처리")
         content, has_coupang = self.insert_coupang_products(
             content, keyword, category_config, category_name
         )
+        print(f"  └─ 쿠팡 삽입: {'✅ Yes' if has_coupang else '❌ No'}")
 
-        # 9. 파트너스 문구 삽입 (쿠팡 배너가 있을 때만)
+        # 파트너스 문구 삽입
         content = self.insert_affiliate_notice(content, has_coupang)
 
-        # 10. 카테고리 뱃지 삽입
-        logger.info("Step 8: Inserting category badge...")
+        # 카테고리 뱃지 삽입
         content = self.insert_category_badge(content, category_name)
 
-        # 11. 정리
+        # 정리
         content = self.clean_meta_tags(content)
 
-        logger.info(f"=" * 50)
-        logger.info(f"Post generation complete!")
-        logger.info(f"  Title: {title}")
-        logger.info(f"  Category: {category_name}")
-        logger.info(f"  Template: {template_name}")
-        logger.info(f"  Content length: {len(content)} chars")
-        logger.info(f"  Has Coupang: {has_coupang}")
-        logger.info(f"=" * 50)
+        # Step 7: 최종 결과
+        print(f"\n[Step 7/7] 최종 결과")
+        print(f"  └─ 제목: {title}")
+        print(f"  └─ 카테고리: {category_name}")
+        print(f"  └─ 콘텐츠 길이: {len(content)} chars")
+        print(f"  └─ 웹 출처: {len(sources)}개")
+        print(f"  └─ 쿠팡: {'있음' if has_coupang else '없음'}")
+
+        print("\n" + "=" * 60)
+        print("✅ 블로그 글 생성 완료!")
+        print("=" * 60 + "\n")
+
+        # 기존 로거 호출 (파일 로그용)
+        logger.info(f"Post generation complete: {title}")
+        logger.info(f"  Category: {category_name}, Template: {template_name}")
+        logger.info(f"  Content: {len(content)} chars, Sources: {len(sources)}, Coupang: {has_coupang}")
 
         return GeneratedPost(
             title=title,
@@ -469,7 +812,8 @@ class ContentGenerator:
             excerpt=excerpt,
             category=category_name,
             template=template_name,
-            has_coupang=has_coupang
+            has_coupang=has_coupang,
+            sources=sources
         )
 
 

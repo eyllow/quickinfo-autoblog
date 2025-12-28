@@ -28,7 +28,8 @@ FONT_STYLES = {
         "weight": "400",
         "color": "#444",
         "margin": "12px 0",
-        "line_height": "2.0"
+        "line_height": "2.0",
+        "text_align": "left"
     },
     "table_header": {
         "size": "15px",

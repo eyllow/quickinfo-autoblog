@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     google_sheets_spreadsheet_id: str = ""
     google_credentials_path: str = str(BASE_DIR / "config" / "google_credentials.json")
 
+    # Google Custom Search 설정
+    google_search_api_key: str = ""
+    google_search_engine_id: str = ""
+
     # 쿠팡 파트너스 설정
     coupang_partner_id: str
 

@@ -1,0 +1,15 @@
+# QuickInfo Dashboard API Dependencies
+
+# FastAPI
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# Pydantic
+pydantic>=2.5.0
+
+# HTTP Client (상위 모듈에서 사용)
+requests>=2.31.0
+
+# Anthropic Claude API (상위 모듈에서 사용)
+anthropic>=0.18.0

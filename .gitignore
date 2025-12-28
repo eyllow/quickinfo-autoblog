@@ -32,3 +32,10 @@ Thumbs.db
 
 # Cache
 .cache/
+
+# Node.js
+node_modules/
+package-lock.json
+
+# Temp files
+temp_screenshots/
