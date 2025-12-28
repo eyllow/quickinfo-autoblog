@@ -1,6 +1,11 @@
-"""WordPress 발행 API 라우터"""
+"""
+WordPress 발행 API 라우터
+SQLite DB 연동으로 발행 통계 영구 저장
+"""
 import logging
+import sqlite3
 from pathlib import Path
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException
 
@@ -15,50 +20,102 @@ from dashboard.backend.models import PublishRequest, PublishResponse
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/publish", tags=["publish"])
 
+# DB 경로 설정
+DB_PATH = PROJECT_ROOT / "data" / "posts.db"
+
+
+def get_db_connection():
+    """SQLite DB 연결"""
+    # data 폴더 없으면 생성
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    """DB 테이블 초기화"""
+    conn = get_db_connection()
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS posts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            keyword TEXT,
+            category TEXT,
+            wp_post_id INTEGER,
+            wp_url TEXT,
+            status TEXT DEFAULT 'draft',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+    logger.info(f"SQLite DB initialized: {DB_PATH}")
+
+
+# 앱 시작시 DB 초기화
+init_db()
+
 
 @router.get("/stats")
 async def get_publish_stats():
     """
-    발행 통계 조회
+    발행 통계 조회 (SQLite DB 기반)
 
     오늘, 이번 주, 전체 발행 수 반환
     """
-    from dashboard.backend.routers.articles import articles_store
-    from datetime import datetime, timedelta
+    try:
+        conn = get_db_connection()
 
-    now = datetime.now()
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    week_start = today_start - timedelta(days=now.weekday())
+        now = datetime.now()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        week_start = today_start - timedelta(days=now.weekday())
 
-    today_published = 0
-    this_week = 0
-    total_published = 0
-    drafts = 0
+        # 오늘 발행 수
+        today_published = conn.execute(
+            "SELECT COUNT(*) FROM posts WHERE status='published' AND created_at >= ?",
+            (today_start.isoformat(),)
+        ).fetchone()[0]
 
-    for article in articles_store.values():
-        created_at = datetime.fromisoformat(article["created_at"])
+        # 이번 주 발행 수
+        this_week = conn.execute(
+            "SELECT COUNT(*) FROM posts WHERE status='published' AND created_at >= ?",
+            (week_start.isoformat(),)
+        ).fetchone()[0]
 
-        if article["status"] == "published":
-            total_published += 1
-            if created_at >= today_start:
-                today_published += 1
-            if created_at >= week_start:
-                this_week += 1
-        else:
-            drafts += 1
+        # 전체 발행 수
+        total_published = conn.execute(
+            "SELECT COUNT(*) FROM posts WHERE status='published'"
+        ).fetchone()[0]
 
-    return {
-        "today_published": today_published,
-        "this_week": this_week,
-        "total_published": total_published,
-        "drafts": drafts
-    }
+        # 대기 중 (draft)
+        drafts = conn.execute(
+            "SELECT COUNT(*) FROM posts WHERE status='draft'"
+        ).fetchone()[0]
+
+        conn.close()
+
+        return {
+            "today_published": today_published,
+            "this_week": this_week,
+            "total_published": total_published,
+            "drafts": drafts
+        }
+    except Exception as e:
+        logger.error(f"통계 조회 오류: {e}")
+        return {
+            "today_published": 0,
+            "this_week": 0,
+            "total_published": 0,
+            "drafts": 0
+        }
 
 
 @router.post("/", response_model=PublishResponse)
 async def publish_article(request: PublishRequest):
     """
-    실제 WordPress에 글 발행
+    실제 WordPress에 글 발행 및 DB 기록
 
     articles_store에서 글을 가져와 WordPress REST API로 발행
     """
@@ -90,10 +147,31 @@ async def publish_article(request: PublishRequest):
         )
 
         if result.success and result.url:
-            # 글 상태 업데이트
+            # 글 상태 업데이트 (메모리)
             article["status"] = "published" if request.status == "publish" else "draft"
             article["wp_url"] = result.url
             article["wp_id"] = result.post_id
+
+            # SQLite DB에 기록
+            try:
+                conn = get_db_connection()
+                conn.execute(
+                    """INSERT INTO posts (title, keyword, category, wp_post_id, wp_url, status)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (
+                        article["title"],
+                        article.get("keyword", ""),
+                        article.get("category", "트렌드"),
+                        result.post_id,
+                        result.url,
+                        "published" if request.status == "publish" else "draft"
+                    )
+                )
+                conn.commit()
+                conn.close()
+                logger.info(f"Post recorded to DB: {article['title']}")
+            except Exception as db_error:
+                logger.error(f"DB 기록 실패: {db_error}")
 
             logger.info(f"Article published: {result.url}")
 
@@ -157,3 +235,22 @@ async def get_publish_status(article_id: str):
         "wp_url": article.get("wp_url"),
         "wp_id": article.get("wp_id")
     }
+
+
+@router.get("/recent")
+async def get_recent_posts(limit: int = 10):
+    """최근 발행 글 목록 (SQLite DB 기반)"""
+    try:
+        conn = get_db_connection()
+        posts = conn.execute(
+            """SELECT * FROM posts ORDER BY created_at DESC LIMIT ?""",
+            (limit,)
+        ).fetchall()
+        conn.close()
+
+        return {
+            "posts": [dict(post) for post in posts]
+        }
+    except Exception as e:
+        logger.error(f"최근 글 조회 오류: {e}")
+        return {"posts": []}
