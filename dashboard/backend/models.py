@@ -81,6 +81,21 @@ class NaturalEditResponse(BaseModel):
     error: Optional[str] = None
 
 
+class ElementEditRequest(BaseModel):
+    """개별 요소 수정 요청 (섹션 단위, 서버 저장 없음)"""
+    element_content: str  # 수정할 요소의 현재 HTML
+    instruction: str  # 수정 지시
+    element_type: str = "paragraph"  # title, paragraph, list, table, quote, image
+    keyword: str = ""  # 키워드 (컨텍스트용)
+
+
+class ElementEditResponse(BaseModel):
+    """개별 요소 수정 응답"""
+    success: bool
+    updated_content: Optional[str] = None
+    error: Optional[str] = None
+
+
 # =============================================================================
 # 발행 관련 모델
 # =============================================================================

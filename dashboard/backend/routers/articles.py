@@ -25,6 +25,8 @@ from dashboard.backend.models import (
     AdjustLengthResponse,
     NaturalEditRequest,
     NaturalEditResponse,
+    ElementEditRequest,
+    ElementEditResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -296,6 +298,27 @@ async def update_title(article_id: str, title: str):
     return {"success": True, "title": title}
 
 
+@router.put("/{article_id}/content")
+async def update_content(article_id: str, request: dict):
+    """
+    글 내용 업데이트 (발행 전 로컬 수정사항 동기화용)
+    """
+    if article_id not in articles_store:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    content = request.get("content", "")
+    if not content:
+        raise HTTPException(status_code=400, detail="Content is required")
+
+    article = articles_store[article_id]
+    article["raw_content"] = content
+    article["sections"] = [s.model_dump() for s in parse_sections(content)]
+
+    logger.info(f"Article content updated: {article_id}")
+
+    return {"success": True, "message": "Content updated"}
+
+
 @router.get("/keywords/suggestions", response_model=List[KeywordSuggestion])
 async def get_keyword_suggestions():
     """
@@ -400,6 +423,68 @@ async def adjust_article_length(article_id: str, request: AdjustLengthRequest):
     except Exception as e:
         logger.error(f"Adjust length failed: {e}")
         return AdjustLengthResponse(
+            success=False,
+            error=str(e)
+        )
+
+
+@router.post("/edit-element", response_model=ElementEditResponse)
+async def edit_element(request: ElementEditRequest):
+    """
+    개별 요소 수정 (서버 저장 없음)
+
+    프론트엔드에서 섹션 단위로 수정 요청을 보내면,
+    AI가 해당 요소만 수정하여 반환합니다.
+    서버의 article_store는 건드리지 않습니다.
+    """
+    try:
+        generator = ContentGenerator()
+
+        type_labels = {
+            'title': '제목',
+            'paragraph': '문단',
+            'list': '리스트',
+            'table': '표',
+            'quote': '인용문',
+            'image': '이미지',
+            'other': '요소'
+        }
+        type_label = type_labels.get(request.element_type, '요소')
+
+        edit_prompt = f"""다음 블로그 {type_label}을 수정해주세요.
+
+[현재 내용]
+{request.element_content}
+
+[수정 요청]
+{request.instruction}
+
+{f'[키워드] {request.keyword}' if request.keyword else ''}
+
+[규칙]
+1. 같은 HTML 태그 구조 유지 (예: h2는 h2로, p는 p로)
+2. 요청된 수정사항만 반영
+3. 자연스럽고 친근한 어투 유지
+4. 수정된 HTML만 출력 (설명 없이)
+"""
+
+        edited_content = generator._call_claude(edit_prompt, max_tokens=2000)
+
+        # HTML 코드 블록 제거
+        edited_content = re.sub(r'^```html\s*', '', edited_content, flags=re.MULTILINE)
+        edited_content = re.sub(r'\s*```$', '', edited_content, flags=re.MULTILINE)
+        edited_content = edited_content.strip()
+
+        logger.info(f"Element edited successfully: {request.element_type}")
+
+        return ElementEditResponse(
+            success=True,
+            updated_content=edited_content
+        )
+
+    except Exception as e:
+        logger.error(f"Element edit failed: {e}")
+        return ElementEditResponse(
             success=False,
             error=str(e)
         )
