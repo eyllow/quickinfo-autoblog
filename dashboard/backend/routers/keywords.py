@@ -94,6 +94,32 @@ async def get_evergreen_keywords():
         }
 
 
+@router.post("/refresh", response_model=KeywordResponse)
+async def refresh_trending_keywords():
+    """Google Trends에서 최신 인기 키워드 새로고침"""
+    try:
+        from crawlers.google_trends import GoogleTrendsCrawler
+
+        crawler = GoogleTrendsCrawler()
+        # 캐시 무시하고 새로 가져오기
+        trend_data = crawler.get_trending_keywords(count=10, force_refresh=True)
+
+        return {
+            "keywords": [
+                {
+                    "keyword": item["keyword"],
+                    "trend_score": 5 - i if i < 5 else 1,
+                    "category": item.get("category", "트렌드"),
+                    "source": "trends"
+                }
+                for i, item in enumerate(trend_data)
+            ]
+        }
+    except Exception as e:
+        # 실패 시 기존 trending 호출
+        return await get_trending_keywords()
+
+
 @router.get("/recent")
 async def get_recent_keywords():
     """최근 발행된 키워드 목록"""
