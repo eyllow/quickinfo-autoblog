@@ -66,6 +66,21 @@ class SectionEditResponse(BaseModel):
     error: Optional[str] = None
 
 
+class NaturalEditRequest(BaseModel):
+    """자연어 수정 요청"""
+    instruction: str  # 자연어 수정 지시
+    section_id: Optional[str] = None  # 특정 섹션 지정 (선택)
+
+
+class NaturalEditResponse(BaseModel):
+    """자연어 수정 응답"""
+    success: bool
+    action_type: str = ""  # "screenshot", "image_delete", "section_edit", "full_edit"
+    message: str = ""
+    updated_content: Optional[str] = None
+    error: Optional[str] = None
+
+
 # =============================================================================
 # 발행 관련 모델
 # =============================================================================

@@ -23,6 +23,8 @@ from dashboard.backend.models import (
     KeywordSuggestion,
     AdjustLengthRequest,
     AdjustLengthResponse,
+    NaturalEditRequest,
+    NaturalEditResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -398,6 +400,279 @@ async def adjust_article_length(article_id: str, request: AdjustLengthRequest):
     except Exception as e:
         logger.error(f"Adjust length failed: {e}")
         return AdjustLengthResponse(
+            success=False,
+            error=str(e)
+        )
+
+
+def extract_number_from_text(text: str) -> Optional[int]:
+    """텍스트에서 숫자 추출 (첫 번째, 두 번째 등)"""
+    korean_numbers = {
+        '첫': 1, '첫번째': 1, '첫 번째': 1, '1번째': 1,
+        '두': 2, '두번째': 2, '두 번째': 2, '2번째': 2,
+        '세': 3, '세번째': 3, '세 번째': 3, '3번째': 3,
+        '네': 4, '네번째': 4, '네 번째': 4, '4번째': 4,
+        '다섯': 5, '다섯번째': 5, '다섯 번째': 5, '5번째': 5,
+    }
+    for k, v in korean_numbers.items():
+        if k in text:
+            return v
+    # 숫자만 있는 경우
+    match = re.search(r'(\d+)', text)
+    if match:
+        return int(match.group(1))
+    return None
+
+
+@router.post("/{article_id}/natural-edit", response_model=NaturalEditResponse)
+async def natural_edit(article_id: str, request: NaturalEditRequest):
+    """
+    자연어 수정 요청 처리
+
+    다양한 수정 요청을 자연어로 받아 처리:
+    - URL 스크린샷 요청
+    - 이미지 삭제/교체
+    - 섹션 수정
+    - 전체 글 수정
+    """
+    if article_id not in articles_store:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    article = articles_store[article_id]
+    instruction = request.instruction.strip()
+
+    try:
+        # 1. URL 스크린샷 요청 감지
+        url_match = re.search(r'https?://[^\s]+', instruction)
+        if url_match and ('스크린샷' in instruction or '캡처' in instruction or '화면' in instruction):
+            url = url_match.group().rstrip('.,!?')
+            logger.info(f"Screenshot request detected: {url}")
+
+            try:
+                from utils.unique_image import generate_unique_screenshot
+
+                # 스크린샷 생성
+                keyword = article["keyword"]
+                screenshot_path = generate_unique_screenshot(keyword, url=url)
+
+                if screenshot_path:
+                    # WordPress에 업로드
+                    from utils.image_fetcher import ImageFetcher
+                    fetcher = ImageFetcher()
+                    uploaded_url = fetcher.upload_to_wordpress_media(
+                        screenshot_path,
+                        alt_text=f"{keyword} 관련 스크린샷"
+                    )
+
+                    if uploaded_url:
+                        # 콘텐츠에 이미지 추가 또는 교체
+                        img_tag = f'<figure class="wp-block-image"><img src="{uploaded_url}" alt="{keyword} 스크린샷"/></figure>'
+
+                        # 첫 번째 섹션 끝에 이미지 추가
+                        if article["sections"]:
+                            article["sections"][0]["content"] += img_tag
+                            article["raw_content"] = "".join([s["content"] for s in article["sections"]])
+
+                        return NaturalEditResponse(
+                            success=True,
+                            action_type="screenshot",
+                            message=f"스크린샷이 추가되었습니다: {url}",
+                            updated_content=article["raw_content"]
+                        )
+            except Exception as e:
+                logger.error(f"Screenshot failed: {e}")
+                return NaturalEditResponse(
+                    success=False,
+                    action_type="screenshot",
+                    error=f"스크린샷 생성 실패: {str(e)}"
+                )
+
+        # 2. 이미지 삭제 요청 감지
+        if '이미지' in instruction and '삭제' in instruction:
+            img_index = extract_number_from_text(instruction)
+            if img_index is None:
+                img_index = 1  # 기본값
+
+            logger.info(f"Image delete request: index {img_index}")
+
+            # 이미지 태그 찾아서 삭제
+            content = article["raw_content"]
+            img_patterns = [
+                r'<figure[^>]*>.*?<img[^>]*>.*?</figure>',
+                r'<img[^>]*/?>'
+            ]
+
+            for pattern in img_patterns:
+                matches = list(re.finditer(pattern, content, re.DOTALL))
+                if len(matches) >= img_index:
+                    match = matches[img_index - 1]
+                    content = content[:match.start()] + content[match.end():]
+                    break
+
+            article["raw_content"] = content
+            article["sections"] = [s.model_dump() for s in parse_sections(content)]
+
+            return NaturalEditResponse(
+                success=True,
+                action_type="image_delete",
+                message=f"{img_index}번째 이미지가 삭제되었습니다.",
+                updated_content=content
+            )
+
+        # 3. 이미지 검색/교체 요청 감지
+        if '이미지' in instruction and ('바꿔' in instruction or '교체' in instruction or '변경' in instruction):
+            # 검색어 추출 시도
+            search_query = article["keyword"]  # 기본값
+
+            # "세금 관련 이미지로" 같은 패턴에서 검색어 추출
+            query_match = re.search(r'(.+?)\s*(관련|이미지|사진)', instruction)
+            if query_match:
+                search_query = query_match.group(1).strip()
+
+            logger.info(f"Image replace request: query '{search_query}'")
+
+            try:
+                from utils.image_fetcher import ImageFetcher
+                fetcher = ImageFetcher()
+                photos = fetcher.search_pexels_single(search_query, per_page=1)
+
+                if photos:
+                    photo = photos[0]
+                    img_url = photo.get("src", {}).get("large") or photo.get("src", {}).get("medium", "")
+
+                    if img_url:
+                        img_index = extract_number_from_text(instruction) or 1
+
+                        # 이미지 교체
+                        content = article["raw_content"]
+                        new_img = f'<figure class="wp-block-image"><img src="{img_url}" alt="{search_query}"/></figure>'
+
+                        img_patterns = [
+                            r'<figure[^>]*>.*?<img[^>]*>.*?</figure>',
+                            r'<img[^>]*/?>'
+                        ]
+
+                        replaced = False
+                        for pattern in img_patterns:
+                            matches = list(re.finditer(pattern, content, re.DOTALL))
+                            if len(matches) >= img_index:
+                                match = matches[img_index - 1]
+                                content = content[:match.start()] + new_img + content[match.end():]
+                                replaced = True
+                                break
+
+                        if not replaced:
+                            # 이미지가 없으면 첫 섹션에 추가
+                            if article["sections"]:
+                                article["sections"][0]["content"] += new_img
+                                content = "".join([s["content"] for s in article["sections"]])
+
+                        article["raw_content"] = content
+                        article["sections"] = [s.model_dump() for s in parse_sections(content)]
+
+                        return NaturalEditResponse(
+                            success=True,
+                            action_type="image_replace",
+                            message=f"이미지가 '{search_query}' 검색 결과로 교체되었습니다.",
+                            updated_content=content
+                        )
+            except Exception as e:
+                logger.error(f"Image replace failed: {e}")
+
+        # 4. 섹션 수정 요청 (AI 처리)
+        section_index = extract_number_from_text(instruction)
+
+        if section_index and section_index <= len(article["sections"]):
+            # 특정 섹션 수정
+            target_section = article["sections"][section_index - 1]
+            logger.info(f"Section edit request: section {section_index}")
+        elif request.section_id:
+            # section_id로 지정된 경우
+            target_section = None
+            section_index = None
+            for i, s in enumerate(article["sections"]):
+                if s["id"] == request.section_id:
+                    target_section = s
+                    section_index = i + 1
+                    break
+        else:
+            # 전체 글 수정
+            target_section = None
+            section_index = None
+
+        generator = ContentGenerator()
+
+        if target_section:
+            # 특정 섹션만 수정
+            edit_prompt = f"""다음 블로그 섹션을 수정해주세요.
+
+[원본 내용]
+{target_section["content"]}
+
+[수정 요청]
+{instruction}
+
+[키워드]
+{article["keyword"]}
+
+[규칙]
+1. HTML 형식 유지
+2. 자연스럽고 친근한 어투
+3. 수정된 HTML만 출력
+"""
+            edited = generator._call_claude(edit_prompt, max_tokens=3000)
+            edited = re.sub(r'^```html\s*', '', edited, flags=re.MULTILINE)
+            edited = re.sub(r'\s*```$', '', edited, flags=re.MULTILINE)
+            edited = edited.strip()
+
+            article["sections"][section_index - 1]["content"] = edited
+            article["raw_content"] = "".join([s["content"] for s in article["sections"]])
+
+            return NaturalEditResponse(
+                success=True,
+                action_type="section_edit",
+                message=f"{section_index}번째 섹션이 수정되었습니다.",
+                updated_content=article["raw_content"]
+            )
+        else:
+            # 전체 글 수정
+            edit_prompt = f"""다음 블로그 글 전체를 수정해주세요.
+
+[원본 내용]
+{article["raw_content"]}
+
+[수정 요청]
+{instruction}
+
+[키워드]
+{article["keyword"]}
+
+[규칙]
+1. HTML 형식 유지
+2. 자연스럽고 친근한 어투
+3. 기존 구조(h2, p 등) 유지
+4. 수정된 HTML만 출력
+"""
+            edited = generator._call_claude(edit_prompt, max_tokens=8000)
+            edited = re.sub(r'^```html\s*', '', edited, flags=re.MULTILINE)
+            edited = re.sub(r'\s*```$', '', edited, flags=re.MULTILINE)
+            edited = edited.strip()
+
+            article["raw_content"] = edited
+            article["sections"] = [s.model_dump() for s in parse_sections(edited)]
+
+            return NaturalEditResponse(
+                success=True,
+                action_type="full_edit",
+                message="전체 글이 수정되었습니다.",
+                updated_content=edited
+            )
+
+    except Exception as e:
+        logger.error(f"Natural edit failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return NaturalEditResponse(
             success=False,
             error=str(e)
         )
