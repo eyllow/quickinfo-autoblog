@@ -1,68 +1,26 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 :root {
-  --background: #0f172a;
-  --foreground: #f8fafc;
-  --card: #1e293b;
-  --card-foreground: #f8fafc;
-  --primary: #3b82f6;
-  --primary-foreground: #ffffff;
-  --secondary: #1e293b;
-  --muted: #334155;
-  --muted-foreground: #94a3b8;
-  --accent: #22c55e;
-  --border: #334155;
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-}
-
-.card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
-}
-
-.btn-primary {
-  @apply bg-primary text-white px-4 py-2 rounded-lg font-medium transition-all;
-  @apply hover:bg-primary/90 active:scale-95;
-}
-
-.btn-secondary {
-  @apply bg-secondary text-white px-4 py-2 rounded-lg font-medium transition-all;
-  @apply hover:bg-secondary/80 border border-border;
-}
-
-.btn-accent {
-  @apply bg-accent text-white px-4 py-2 rounded-lg font-medium transition-all;
-  @apply hover:bg-accent/90 active:scale-95;
-}
-
-.input {
-  @apply bg-secondary border border-border rounded-lg px-3 py-2 text-foreground;
-  @apply focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary;
-}
-
-/* 스크롤바 스타일 */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--secondary);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--muted);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--muted-foreground);
+  font-family: Arial, Helvetica, sans-serif;
 }

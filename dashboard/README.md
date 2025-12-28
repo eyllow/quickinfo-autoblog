@@ -18,8 +18,14 @@ dashboard/
 │
 └── frontend/          # Next.js 프론트엔드 (포트 3003)
     ├── app/
-    ├── components/
-    └── lib/
+    │   └── page.tsx         # 메인 대시보드
+    └── components/
+        ├── ModeToggle.tsx       # 반자동/완전자동 모드 전환
+        ├── KeywordSelector.tsx  # 키워드 선택
+        ├── ArticleEditor.tsx    # 글 편집기
+        ├── SectionEditor.tsx    # 섹션별 편집
+        ├── ImageManager.tsx     # 이미지 관리
+        └── PublishStats.tsx     # 발행 통계
 ```
 
 ## 실행 방법
