@@ -60,3 +60,51 @@ npm run dev
 - `POST /api/images/search/pexels` - Pexels 이미지 검색
 - `POST /api/publish/` - WordPress 발행
 - `GET /api/settings/` - 설정 조회
+
+## 서버 배포
+
+### 최초 설치 (서버에서 한 번만)
+
+```bash
+cd ~/quickinfo-autoblog/dashboard/deploy
+./install_services.sh
+```
+
+### 업데이트 배포
+
+```bash
+cd ~/quickinfo-autoblog/dashboard/deploy
+./deploy_dashboard.sh
+```
+
+### 서비스 관리
+
+```bash
+# 상태 확인
+sudo systemctl status quickinfo-dashboard-api
+sudo systemctl status quickinfo-dashboard-web
+
+# 재시작
+sudo systemctl restart quickinfo-dashboard-api
+sudo systemctl restart quickinfo-dashboard-web
+
+# 로그 확인
+sudo journalctl -u quickinfo-dashboard-api -f
+sudo journalctl -u quickinfo-dashboard-web -f
+```
+
+### 접속 URL
+
+- API: http://43.202.224.41:8003
+- Web: http://43.202.224.41:3003
+
+## 확인사항
+
+- [ ] 반자동/완전자동 모드 토글 작동
+- [ ] 키워드 추천 목록 표시
+- [ ] 글 생성 후 섹션별 미리보기
+- [ ] 섹션 수정 요청 -> AI 재작성
+- [ ] 이미지 교체 (Pexels/스크린샷/삭제)
+- [ ] 글 길이 조절
+- [ ] 발행 버튼 -> WordPress 발행
+- [ ] 발행 통계 표시
