@@ -19,6 +19,18 @@ logger = logging.getLogger(__name__)
 SCRIPT_DIR = Path(__file__).resolve().parent
 SCREENSHOT_SCRIPT = SCRIPT_DIR / "screenshot.js"
 
+# Node.js 경로 설정 (서버 환경에서 cron 실행 시 PATH 문제 해결)
+NODE_PATH = "/usr/bin/node"  # 기본 경로
+if not os.path.exists(NODE_PATH):
+    # nvm 사용 시 대체 경로
+    home = os.path.expanduser("~")
+    nvm_node = f"{home}/.nvm/versions/node/v20.18.2/bin/node"
+    if os.path.exists(nvm_node):
+        NODE_PATH = nvm_node
+    else:
+        # PATH에서 찾기
+        NODE_PATH = "node"
+
 # Puppeteer/Chrome 실행 옵션 (서버 환경 호환)
 CHROME_ARGS = [
     '--no-sandbox',
@@ -198,14 +210,15 @@ class ScreenshotCapture:
         Node.js와 Puppeteer가 설치되어 있어야 함
         """
         try:
-            # Node.js 확인
+            # Node.js 확인 (절대 경로 사용)
             result = subprocess.run(
-                ["node", "--version"],
+                [NODE_PATH, "--version"],
                 capture_output=True,
                 text=True,
                 timeout=5
             )
             if result.returncode != 0:
+                logger.warning(f"Node.js 실행 실패: {NODE_PATH}")
                 return False
 
             # 스크립트 파일 존재 확인
@@ -279,10 +292,10 @@ class ScreenshotCapture:
         try:
             logger.info(f"스크린샷 캡처 중: {keyword} -> {url}")
 
-            # Node.js 스크립트 실행
+            # Node.js 스크립트 실행 (절대 경로 사용)
             result = subprocess.run(
                 [
-                    "node",
+                    NODE_PATH,
                     str(self.script_path),
                     url,
                     str(output_path),
