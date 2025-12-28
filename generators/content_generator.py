@@ -2,8 +2,9 @@
 import json
 import logging
 import re
-from typing import Optional
-from dataclasses import dataclass
+import uuid
+from typing import Optional, List
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import anthropic
@@ -88,6 +89,15 @@ COUPANG_EXCLUDE_CATEGORIES = ["연예", "트렌드", "재테크", "취업교육"
 
 
 @dataclass
+class Section:
+    """섹션 데이터"""
+    id: str
+    index: int
+    type: str  # heading, image, paragraph, list, table, quote
+    html: str
+
+
+@dataclass
 class GeneratedPost:
     """생성된 포스트 데이터"""
     title: str
@@ -97,10 +107,29 @@ class GeneratedPost:
     template: str
     has_coupang: bool = False
     sources: list = None  # 웹검색 출처 목록
+    sections: List[Section] = field(default_factory=list)  # 섹션 배열
 
     def __post_init__(self):
         if self.sources is None:
             self.sources = []
+        if self.sections is None:
+            self.sections = []
+
+    def to_dict(self) -> dict:
+        """딕셔너리로 변환 (API 응답용)"""
+        return {
+            "title": self.title,
+            "content": self.content,
+            "excerpt": self.excerpt,
+            "category": self.category,
+            "template": self.template,
+            "has_coupang": self.has_coupang,
+            "sources": self.sources,
+            "sections": [
+                {"id": s.id, "index": s.index, "type": s.type, "html": s.html}
+                for s in self.sections
+            ]
+        }
 
 
 class ContentGenerator:
@@ -670,6 +699,68 @@ class ContentGenerator:
 
         return content.strip()
 
+    def _detect_section_type(self, html: str) -> str:
+        """섹션 타입 감지"""
+        html_lower = html.lower().strip()
+
+        if html_lower.startswith('<h1') or html_lower.startswith('<h2') or html_lower.startswith('<h3'):
+            return "heading"
+        elif '<figure' in html_lower or html_lower.startswith('<img'):
+            return "image"
+        elif '<ul' in html_lower or '<ol' in html_lower:
+            return "list"
+        elif '<table' in html_lower:
+            return "table"
+        elif '<blockquote' in html_lower:
+            return "quote"
+        else:
+            return "paragraph"
+
+    def parse_content_to_sections(self, html: str) -> List[Section]:
+        """
+        HTML 콘텐츠를 섹션 배열로 분리
+
+        각 섹션은 독립적으로 수정 가능한 단위
+        """
+        sections = []
+
+        # 최상위 HTML 태그들을 매칭
+        # h1-h6, p, div, figure, ul, ol, table, blockquote, section
+        pattern = r'(<(?:h[1-6]|p|div|figure|ul|ol|table|blockquote|section)[^>]*>.*?</(?:h[1-6]|p|div|figure|ul|ol|table|blockquote|section)>)'
+
+        matches = re.findall(pattern, html, re.DOTALL | re.IGNORECASE)
+
+        if matches:
+            for i, match in enumerate(matches):
+                section_html = match.strip()
+                if not section_html:
+                    continue
+
+                # 빈 콘텐츠 제외 (이미지는 예외)
+                text_content = re.sub(r'<[^>]+>', '', section_html).strip()
+                if not text_content and '<img' not in section_html.lower() and '<figure' not in section_html.lower():
+                    continue
+
+                section_type = self._detect_section_type(section_html)
+                sections.append(Section(
+                    id=f"section-{uuid.uuid4().hex[:8]}",
+                    index=len(sections),
+                    type=section_type,
+                    html=section_html
+                ))
+        else:
+            # 매칭 안 된 경우 전체를 하나의 섹션으로
+            if html.strip():
+                sections.append(Section(
+                    id=f"section-{uuid.uuid4().hex[:8]}",
+                    index=0,
+                    type="paragraph",
+                    html=html.strip()
+                ))
+
+        logger.info(f"Parsed {len(sections)} sections from content")
+        return sections
+
     def generate_full_post(
         self,
         keyword: str,
@@ -789,11 +880,20 @@ class ContentGenerator:
         # 정리
         content = self.clean_meta_tags(content)
 
-        # Step 7: 최종 결과
-        print(f"\n[Step 7/7] 최종 결과")
+        # Step 7: 섹션 분리
+        print(f"\n[Step 7/8] 섹션 분리")
+        sections = self.parse_content_to_sections(content)
+        print(f"  └─ 섹션 수: {len(sections)}개")
+        for s in sections[:5]:  # 처음 5개만 표시
+            text_preview = re.sub(r'<[^>]+>', '', s.html)[:30].strip()
+            print(f"      • [{s.type}] {text_preview}...")
+
+        # Step 8: 최종 결과
+        print(f"\n[Step 8/8] 최종 결과")
         print(f"  └─ 제목: {title}")
         print(f"  └─ 카테고리: {category_name}")
         print(f"  └─ 콘텐츠 길이: {len(content)} chars")
+        print(f"  └─ 섹션 수: {len(sections)}개")
         print(f"  └─ 웹 출처: {len(sources)}개")
         print(f"  └─ 쿠팡: {'있음' if has_coupang else '없음'}")
 
@@ -804,7 +904,7 @@ class ContentGenerator:
         # 기존 로거 호출 (파일 로그용)
         logger.info(f"Post generation complete: {title}")
         logger.info(f"  Category: {category_name}, Template: {template_name}")
-        logger.info(f"  Content: {len(content)} chars, Sources: {len(sources)}, Coupang: {has_coupang}")
+        logger.info(f"  Content: {len(content)} chars, Sections: {len(sections)}, Sources: {len(sources)}, Coupang: {has_coupang}")
 
         return GeneratedPost(
             title=title,
@@ -813,7 +913,8 @@ class ContentGenerator:
             category=category_name,
             template=template_name,
             has_coupang=has_coupang,
-            sources=sources
+            sources=sources,
+            sections=sections
         )
 
 

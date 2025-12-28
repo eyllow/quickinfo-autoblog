@@ -80,6 +80,7 @@ async def generate_article(request: ArticleCreate):
     실제 AI로 블로그 글 생성
 
     ContentGenerator를 사용하여 고품질 콘텐츠 생성
+    섹션은 ContentGenerator에서 직접 파싱하여 반환
     """
     try:
         logger.info(f"Generating article for keyword: {request.keyword}")
@@ -89,23 +90,41 @@ async def generate_article(request: ArticleCreate):
         # 에버그린 모드 확인 (is_evergreen 또는 mode로 판단)
         is_evergreen = request.is_evergreen or request.mode == "evergreen" or generator.is_evergreen_keyword(request.keyword)
 
-        # 실제 글 생성
+        # 실제 글 생성 (섹션 포함)
         post = generator.generate_full_post(
             keyword=request.keyword,
             news_data=""  # 대시보드에서는 뉴스 데이터 없이 생성
         )
 
-        # 섹션 파싱
-        sections = parse_sections(post.content)
-
         # 고유 ID 생성
         article_id = str(uuid.uuid4())[:8]
+
+        # 섹션을 딕셔너리로 변환 (GeneratedPost.sections는 Section 객체 리스트)
+        sections_dict = [
+            {"id": s.id, "index": s.index, "type": s.type, "html": s.html}
+            for s in post.sections
+        ] if post.sections else []
+
+        # 호환성을 위해 기존 Section 모델도 생성
+        legacy_sections = []
+        for i, s in enumerate(sections_dict):
+            # 제목 추출 (h 태그에서)
+            title_match = re.search(r'<h[1-6][^>]*>(.*?)</h[1-6]>', s["html"], re.IGNORECASE | re.DOTALL)
+            title = re.sub(r'<[^>]+>', '', title_match.group(1)).strip() if title_match else f"섹션 {i+1}"
+
+            legacy_sections.append(Section(
+                id=s["id"],
+                title=title,
+                content=s["html"],
+                order=i
+            ))
 
         article = {
             "id": article_id,
             "keyword": request.keyword,
             "title": post.title,
-            "sections": [s.model_dump() for s in sections],
+            "sections": [s.model_dump() for s in legacy_sections],  # 기존 호환용
+            "sections_v2": sections_dict,  # 새 섹션 구조
             "raw_content": post.content,
             "category": post.category,
             "template": post.template,
@@ -120,13 +139,13 @@ async def generate_article(request: ArticleCreate):
         # 저장소에 저장
         articles_store[article_id] = article
 
-        logger.info(f"Article generated successfully: {article_id} - {post.title}")
+        logger.info(f"Article generated successfully: {article_id} - {post.title} ({len(sections_dict)} sections)")
 
         return ArticleResponse(
             id=article_id,
             keyword=request.keyword,
             title=post.title,
-            sections=sections,
+            sections=legacy_sections,
             raw_content=post.content,
             category=post.category,
             template=post.template,
@@ -138,6 +157,8 @@ async def generate_article(request: ArticleCreate):
 
     except Exception as e:
         logger.error(f"Article generation failed: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"글 생성 실패: {str(e)}")
 
 
