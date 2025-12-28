@@ -47,6 +47,56 @@ def clean_ai_response(content: str) -> str:
 
     return content
 
+
+def clean_html_styles(html_content: str) -> str:
+    """
+    발행 전 불필요한 스타일 제거 (왼쪽 검은 라인 등)
+
+    WordPress에서 blockquote/border-left 스타일이
+    왼쪽 검은 라인으로 표시되는 문제 해결
+
+    Args:
+        html_content: HTML 콘텐츠
+
+    Returns:
+        정리된 HTML 콘텐츠
+    """
+    # blockquote 태그를 일반 div로 변환
+    html_content = re.sub(
+        r'<blockquote[^>]*>',
+        '<div class="info-box">',
+        html_content
+    )
+    html_content = html_content.replace('</blockquote>', '</div>')
+
+    # border-left 인라인 스타일 제거 (다양한 형태)
+    html_content = re.sub(
+        r'border-left:\s*[^;"]+;?',
+        '',
+        html_content,
+        flags=re.IGNORECASE
+    )
+
+    # border-l-* Tailwind 클래스 제거
+    html_content = re.sub(
+        r'\bborder-l-\d+\b',
+        '',
+        html_content
+    )
+
+    # border: 스타일에서 왼쪽만 있는 경우 제거
+    html_content = re.sub(
+        r'border:\s*\d+px\s+solid\s+[^;"]+\s*;\s*border-(?:right|top|bottom):\s*none\s*;',
+        '',
+        html_content,
+        flags=re.IGNORECASE
+    )
+
+    # 빈 style 속성 정리
+    html_content = re.sub(r'\s*style="\s*"', '', html_content)
+
+    return html_content
+
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config.settings import settings

@@ -72,16 +72,27 @@ export default function KeywordSelector({ onSelect, loading }: KeywordSelectorPr
   const refreshKeywords = async () => {
     setIsRefreshing(true);
     try {
-      const response = await axios.post(`${API_URL}/api/keywords/refresh`);
-      if (response.data.keywords) {
+      // 현재 탭에 따라 type 파라미터 설정
+      const type = activeTab === 'evergreen' ? 'evergreen' : 'trend';
+      const response = await axios.post(`${API_URL}/api/keywords/refresh`, { type });
+
+      if (response.data.success && response.data.keywords) {
+        if (activeTab === 'trending') {
+          setTrendingKeywords(response.data.keywords);
+        } else if (activeTab === 'evergreen') {
+          setEvergreenKeywords(response.data.keywords);
+        }
+      } else if (response.data.keywords) {
+        // 호환성: success 필드가 없는 경우에도 처리
         if (activeTab === 'trending') {
           setTrendingKeywords(response.data.keywords);
         } else if (activeTab === 'evergreen') {
           setEvergreenKeywords(response.data.keywords);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('새로고침 실패:', error);
+      alert(error.response?.data?.detail || '키워드 새로고침에 실패했습니다.');
       // 새로고침 실패 시 기존 데이터 다시 로드
       await loadKeywords();
     } finally {

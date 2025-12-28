@@ -3,7 +3,7 @@
 트렌드 키워드 및 에버그린 키워드 조회
 """
 from fastapi import APIRouter, HTTPException
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 import sys
 from pathlib import Path
@@ -22,6 +22,10 @@ class KeywordItem(BaseModel):
 
 class KeywordResponse(BaseModel):
     keywords: List[KeywordItem]
+
+
+class RefreshRequest(BaseModel):
+    type: str = "trend"  # "trend" or "evergreen"
 
 
 @router.get("/trending", response_model=KeywordResponse)
@@ -94,30 +98,62 @@ async def get_evergreen_keywords():
         }
 
 
-@router.post("/refresh", response_model=KeywordResponse)
-async def refresh_trending_keywords():
-    """Google Trends에서 최신 인기 키워드 새로고침"""
+@router.post("/refresh")
+async def refresh_keywords(request: RefreshRequest = RefreshRequest()):
+    """키워드 새로고침 (트렌드 또는 에버그린)"""
     try:
-        from crawlers.google_trends import GoogleTrendsCrawler
+        if request.type == "evergreen":
+            # 에버그린 키워드 새로고침
+            import json
+            import random
+            from config.settings import settings
 
-        crawler = GoogleTrendsCrawler()
-        # 캐시 무시하고 새로 가져오기
-        trend_data = crawler.get_trending_keywords(count=10, force_refresh=True)
+            evergreen_path = settings.project_root / "config" / "evergreen_keywords.json"
+            with open(evergreen_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
 
-        return {
-            "keywords": [
-                {
-                    "keyword": item["keyword"],
-                    "trend_score": 5 - i if i < 5 else 1,
-                    "category": item.get("category", "트렌드"),
-                    "source": "trends"
-                }
-                for i, item in enumerate(trend_data)
-            ]
-        }
+            keywords = data.get("keywords", [])
+            # 랜덤하게 섞어서 새로운 느낌 제공
+            random.shuffle(keywords)
+
+            return {
+                "success": True,
+                "keywords": [
+                    {
+                        "keyword": kw,
+                        "trend_score": 3,
+                        "category": "에버그린",
+                        "source": "evergreen"
+                    }
+                    for kw in keywords[:15]
+                ]
+            }
+        else:
+            # 트렌드 키워드 새로고침
+            from crawlers.google_trends import GoogleTrendsCrawler
+
+            crawler = GoogleTrendsCrawler()
+            # 캐시 무시하고 새로 가져오기
+            trend_data = crawler.get_trending_keywords(count=10, force_refresh=True)
+
+            return {
+                "success": True,
+                "keywords": [
+                    {
+                        "keyword": item["keyword"],
+                        "trend_score": 5 - i if i < 5 else 1,
+                        "category": item.get("category", "트렌드"),
+                        "source": "trends"
+                    }
+                    for i, item in enumerate(trend_data)
+                ]
+            }
     except Exception as e:
-        # 실패 시 기존 trending 호출
-        return await get_trending_keywords()
+        print(f"키워드 새로고침 오류: {e}")
+        import traceback
+        traceback.print_exc()
+        # 실패 시에도 success: false로 에러 반환
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/recent")

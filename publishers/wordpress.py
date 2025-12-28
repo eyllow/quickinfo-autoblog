@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config.settings import settings
+from generators.content_generator import clean_html_styles
 
 logger = logging.getLogger(__name__)
 
@@ -303,6 +304,9 @@ class WordPressPublisher:
             PublishResult 객체
         """
         try:
+            # 발행 전 HTML 스타일 정리 (왼쪽 검은 라인 등 제거)
+            content = clean_html_styles(content)
+
             # 카테고리 ID 변환
             category_ids = []
             if categories:
