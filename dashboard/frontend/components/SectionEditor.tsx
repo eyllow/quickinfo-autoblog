@@ -45,16 +45,16 @@ export default function SectionEditor({
   // 섹션의 HTML 콘텐츠
   const sectionHtml = section.content || section.html || '';
 
-  // 섹션 타입별 스타일
-  const borderColors: Record<string, string> = {
-    heading: 'border-l-purple-500',
-    intro: 'border-l-blue-500',
-    paragraph: 'border-l-gray-300',
-    list: 'border-l-green-500',
-    table: 'border-l-orange-500',
-    image: 'border-l-pink-500',
-    cta: 'border-l-red-500',
-    quote: 'border-l-yellow-500',
+  // 섹션 타입별 스타일 (테두리 없이 배경색으로 구분)
+  const sectionStyles: Record<string, string> = {
+    heading: 'bg-purple-50 ring-1 ring-purple-200',
+    intro: 'bg-blue-50 ring-1 ring-blue-200',
+    paragraph: 'bg-white ring-1 ring-gray-200',
+    list: 'bg-green-50 ring-1 ring-green-200',
+    table: 'bg-orange-50 ring-1 ring-orange-200',
+    image: 'bg-pink-50 ring-1 ring-pink-200',
+    cta: 'bg-red-50 ring-1 ring-red-200',
+    quote: 'bg-yellow-50 ring-1 ring-yellow-200',
   };
 
   const typeLabels: Record<string, string> = {
@@ -184,7 +184,7 @@ export default function SectionEditor({
   };
 
   return (
-    <div className={`bg-white rounded-lg shadow overflow-hidden border-l-4 ${borderColors[section.type] || 'border-l-gray-300'}`}>
+    <div className={`rounded-lg shadow overflow-hidden ${sectionStyles[section.type] || 'bg-white ring-1 ring-gray-200'}`}>
       {/* 섹션 헤더 */}
       <div className="px-4 py-2 bg-gray-50 border-b flex justify-between items-center">
         <div className="flex items-center gap-2">

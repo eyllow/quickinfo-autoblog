@@ -25,6 +25,7 @@ export default function KeywordSelector({ onSelect, loading }: KeywordSelectorPr
   const [customCategory, setCustomCategory] = useState('생활');
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [generatingKeyword, setGeneratingKeyword] = useState<string | null>(null);
 
   const categories = ['재테크', '생활', 'IT', '건강', '교육', '부동산', '취업'];
 
@@ -32,6 +33,13 @@ export default function KeywordSelector({ onSelect, loading }: KeywordSelectorPr
   useEffect(() => {
     loadKeywords();
   }, []);
+
+  // loading이 false가 되면 generatingKeyword 초기화
+  useEffect(() => {
+    if (!loading) {
+      setGeneratingKeyword(null);
+    }
+  }, [loading]);
 
   const loadKeywords = async () => {
     setIsLoading(true);
@@ -60,13 +68,17 @@ export default function KeywordSelector({ onSelect, loading }: KeywordSelectorPr
     }
   };
 
-  // 트렌드 키워드 새로고침
-  const refreshTrending = async () => {
+  // 키워드 새로고침 (AI 새추천)
+  const refreshKeywords = async () => {
     setIsRefreshing(true);
     try {
       const response = await axios.post(`${API_URL}/api/keywords/refresh`);
       if (response.data.keywords) {
-        setTrendingKeywords(response.data.keywords);
+        if (activeTab === 'trending') {
+          setTrendingKeywords(response.data.keywords);
+        } else if (activeTab === 'evergreen') {
+          setEvergreenKeywords(response.data.keywords);
+        }
       }
     } catch (error) {
       console.error('새로고침 실패:', error);
@@ -79,6 +91,7 @@ export default function KeywordSelector({ onSelect, loading }: KeywordSelectorPr
 
   // 키워드 선택
   const handleSelect = (keyword: string, category?: string) => {
+    setGeneratingKeyword(keyword);
     onSelect(keyword, category);
   };
 
@@ -88,6 +101,7 @@ export default function KeywordSelector({ onSelect, loading }: KeywordSelectorPr
       alert('키워드를 입력해주세요.');
       return;
     }
+    setGeneratingKeyword(customKeyword.trim());
     onSelect(customKeyword.trim(), customCategory);
   };
 
@@ -98,9 +112,36 @@ export default function KeywordSelector({ onSelect, loading }: KeywordSelectorPr
     ));
   };
 
+  // 특정 키워드가 생성 중인지 확인
+  const isKeywordGenerating = (keyword: string) => {
+    return loading && generatingKeyword === keyword;
+  };
+
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-bold text-gray-800 mb-4">키워드 선택</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold text-gray-800">키워드 선택</h2>
+
+        {/* AI 새추천 버튼 - 트렌드/에버그린 탭에서만 표시 */}
+        {activeTab !== 'custom' && (
+          <button
+            className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-lg font-medium hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 flex items-center gap-2 transition-all"
+            onClick={refreshKeywords}
+            disabled={isRefreshing || loading}
+          >
+            {isRefreshing ? (
+              <>
+                <span className="animate-spin">⟳</span>
+                새로고침 중...
+              </>
+            ) : (
+              <>
+                ✨ AI 새추천
+              </>
+            )}
+          </button>
+        )}
+      </div>
 
       {/* 탭 버튼 */}
       <div className="flex gap-2 mb-6">
@@ -139,46 +180,57 @@ export default function KeywordSelector({ onSelect, loading }: KeywordSelectorPr
       {/* 트렌드 키워드 */}
       {activeTab === 'trending' && (
         <div>
-          <div className="flex justify-between items-center mb-4">
-            <p className="text-sm text-gray-500">Google Trends 기반 인기 키워드</p>
-            <button
-              className="text-sm text-purple-600 hover:text-purple-800 flex items-center gap-1 disabled:opacity-50"
-              onClick={refreshTrending}
-              disabled={isRefreshing || loading}
-            >
-              {isRefreshing ? '새로고침 중...' : '🔄 새로고침'}
-            </button>
-          </div>
+          <p className="text-sm text-gray-500 mb-4">Google Trends 기반 인기 키워드</p>
 
           {isLoading ? (
             <div className="text-center py-8 text-gray-500">로딩 중...</div>
           ) : (
             <div className="grid gap-3">
-              {trendingKeywords.map((kw, idx) => (
-                <div
-                  key={idx}
-                  className={`flex items-center justify-between p-4 border rounded-lg hover:border-purple-400 hover:bg-purple-50 cursor-pointer transition-colors ${loading ? 'opacity-50 pointer-events-none' : ''}`}
-                  onClick={() => !loading && handleSelect(kw.keyword, kw.category)}
-                >
-                  <div>
-                    <span className="font-medium text-gray-800">{kw.keyword}</span>
-                    <span className="ml-2 text-xs px-2 py-1 bg-gray-100 rounded text-gray-500">
-                      {kw.category}
-                    </span>
+              {trendingKeywords.map((kw, idx) => {
+                const isGenerating = isKeywordGenerating(kw.keyword);
+                const isOtherGenerating = loading && generatingKeyword && generatingKeyword !== kw.keyword;
+
+                return (
+                  <div
+                    key={idx}
+                    className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${
+                      isGenerating
+                        ? 'border-purple-400 bg-purple-50'
+                        : isOtherGenerating
+                          ? 'opacity-50 cursor-not-allowed'
+                          : 'hover:border-purple-400 hover:bg-purple-50 cursor-pointer'
+                    }`}
+                    onClick={() => !loading && handleSelect(kw.keyword, kw.category)}
+                  >
+                    <div>
+                      <span className="font-medium text-gray-800">{kw.keyword}</span>
+                      <span className="ml-2 text-xs px-2 py-1 bg-gray-100 rounded text-gray-500">
+                        {kw.category}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-orange-500">
+                        {renderTrendScore(kw.trend_score)}
+                      </span>
+                      <button
+                        className={`px-3 py-1 text-sm rounded transition-colors ${
+                          isGenerating
+                            ? 'bg-purple-500 text-white'
+                            : 'bg-purple-600 text-white hover:bg-purple-700'
+                        } disabled:opacity-50`}
+                        disabled={loading}
+                      >
+                        {isGenerating ? (
+                          <span className="flex items-center gap-1">
+                            <span className="animate-spin text-xs">⟳</span>
+                            생성중...
+                          </span>
+                        ) : '선택'}
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-orange-500">
-                      {renderTrendScore(kw.trend_score)}
-                    </span>
-                    <button
-                      className="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 disabled:opacity-50"
-                      disabled={loading}
-                    >
-                      {loading ? '생성중...' : '선택'}
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -193,26 +245,46 @@ export default function KeywordSelector({ onSelect, loading }: KeywordSelectorPr
             <div className="text-center py-8 text-gray-500">로딩 중...</div>
           ) : (
             <div className="grid gap-3">
-              {evergreenKeywords.map((kw, idx) => (
-                <div
-                  key={idx}
-                  className={`flex items-center justify-between p-4 border rounded-lg hover:border-green-400 hover:bg-green-50 cursor-pointer transition-colors ${loading ? 'opacity-50 pointer-events-none' : ''}`}
-                  onClick={() => !loading && handleSelect(kw.keyword, kw.category)}
-                >
-                  <div>
-                    <span className="font-medium text-gray-800">{kw.keyword}</span>
-                    <span className="ml-2 text-xs px-2 py-1 bg-gray-100 rounded text-gray-500">
-                      {kw.category}
-                    </span>
-                  </div>
-                  <button
-                    className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50"
-                    disabled={loading}
+              {evergreenKeywords.map((kw, idx) => {
+                const isGenerating = isKeywordGenerating(kw.keyword);
+                const isOtherGenerating = loading && generatingKeyword && generatingKeyword !== kw.keyword;
+
+                return (
+                  <div
+                    key={idx}
+                    className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${
+                      isGenerating
+                        ? 'border-green-400 bg-green-50'
+                        : isOtherGenerating
+                          ? 'opacity-50 cursor-not-allowed'
+                          : 'hover:border-green-400 hover:bg-green-50 cursor-pointer'
+                    }`}
+                    onClick={() => !loading && handleSelect(kw.keyword, kw.category)}
                   >
-                    {loading ? '생성중...' : '선택'}
-                  </button>
-                </div>
-              ))}
+                    <div>
+                      <span className="font-medium text-gray-800">{kw.keyword}</span>
+                      <span className="ml-2 text-xs px-2 py-1 bg-gray-100 rounded text-gray-500">
+                        {kw.category}
+                      </span>
+                    </div>
+                    <button
+                      className={`px-3 py-1 text-sm rounded transition-colors ${
+                        isGenerating
+                          ? 'bg-green-500 text-white'
+                          : 'bg-green-600 text-white hover:bg-green-700'
+                      } disabled:opacity-50`}
+                      disabled={loading}
+                    >
+                      {isGenerating ? (
+                        <span className="flex items-center gap-1">
+                          <span className="animate-spin text-xs">⟳</span>
+                          생성중...
+                        </span>
+                      ) : '선택'}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -269,7 +341,12 @@ export default function KeywordSelector({ onSelect, loading }: KeywordSelectorPr
               onClick={handleCustomSubmit}
               disabled={loading || !customKeyword.trim()}
             >
-              {loading ? '글 생성 중...' : '이 키워드로 글 생성하기'}
+              {isKeywordGenerating(customKeyword.trim()) ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="animate-spin">⟳</span>
+                  글 생성 중...
+                </span>
+              ) : '이 키워드로 글 생성하기'}
             </button>
           </div>
         </div>

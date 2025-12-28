@@ -180,6 +180,9 @@ export default function ArticleEditor({ article: initialArticle, onUpdate, onBac
       });
 
       if (response.data.success) {
+        // 발행 성공 이벤트 발송 (PublishStats 새로고침용)
+        window.dispatchEvent(new CustomEvent('post-published', { detail: { success: true } }));
+
         alert(`발행 완료!\n\nURL: ${response.data.url || '확인 필요'}\nPost ID: ${response.data.post_id || '-'}`);
         if (onPublish) onPublish();
         onBack();
