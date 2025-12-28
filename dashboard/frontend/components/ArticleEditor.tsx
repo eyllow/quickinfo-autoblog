@@ -16,9 +16,16 @@ interface ArticleEditorProps {
 export default function ArticleEditor({ article, onUpdate, onBack, onPublish }: ArticleEditorProps) {
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
   const [editInstruction, setEditInstruction] = useState('');
-  const [targetLength, setTargetLength] = useState(article.total_length || 3000);
   const [loading, setLoading] = useState(false);
   const [publishing, setPublishing] = useState(false);
+
+  // 실제 콘텐츠 길이 계산 (HTML 태그 제외)
+  const getContentLength = () => {
+    const rawContent = article.raw_content || '';
+    const textOnly = rawContent.replace(/<[^>]*>/g, '');
+    return textOnly.length;
+  };
+  const contentLength = getContentLength();
 
   const handleEditSection = async () => {
     if (!selectedSection || !editInstruction) return;
@@ -27,19 +34,24 @@ export default function ArticleEditor({ article, onUpdate, onBack, onPublish }: 
     try {
       const res = await axios.post(`${API_URL}/api/articles/${article.id}/edit-section`, {
         section_id: selectedSection,
-        new_content: editInstruction
+        instruction: editInstruction  // AI 수정 지시
       });
 
       // 업데이트된 섹션 반영
-      if (res.data.success) {
+      if (res.data.success && res.data.section) {
         const updatedSections = article.sections.map((s: any) =>
-          s.id === selectedSection ? { ...s, content: editInstruction } : s
+          s.id === selectedSection ? res.data.section : s
         );
         onUpdate({ ...article, sections: updatedSections });
+        alert('수정 완료!');
+      } else {
+        alert(res.data.error || '수정 실패');
       }
       setEditInstruction('');
-    } catch (error) {
-      alert('수정 실패');
+      setSelectedSection(null);
+    } catch (error: any) {
+      console.error('Edit error:', error);
+      alert(error.response?.data?.detail || '수정 실패');
     } finally {
       setLoading(false);
     }
@@ -58,28 +70,43 @@ export default function ArticleEditor({ article, onUpdate, onBack, onPublish }: 
         target_length: targetMap[type]
       });
       if (res.data.success) {
-        setTargetLength(res.data.new_length);
+        // 전체 글 다시 가져오기
+        const articleRes = await axios.get(`${API_URL}/api/articles/${article.id}`);
+        if (articleRes.data) {
+          onUpdate(articleRes.data);
+        }
+        alert(`글 길이가 ${res.data.new_length.toLocaleString()}자로 조절되었습니다.`);
+      } else {
+        alert(res.data.error || '길이 조절 실패');
       }
-    } catch (error) {
-      alert('길이 조절 실패');
+    } catch (error: any) {
+      console.error('Adjust length error:', error);
+      alert(error.response?.data?.detail || '길이 조절 실패');
     } finally {
       setLoading(false);
     }
   };
 
   const handlePublish = async () => {
+    if (!confirm('WordPress에 발행하시겠습니까?')) return;
+
     setPublishing(true);
     try {
       const res = await axios.post(`${API_URL}/api/publish/`, {
-        article_id: article.id
+        article_id: article.id,
+        status: 'publish'
       });
 
       if (res.data.success) {
-        alert(`발행 완료!\n${res.data.url || ''}`);
+        alert(`발행 완료!\n\nURL: ${res.data.url || '확인 필요'}\nPost ID: ${res.data.post_id || '-'}`);
         onBack();
+      } else {
+        alert(`발행 실패: ${res.data.error || '알 수 없는 오류'}`);
       }
-    } catch (error) {
-      alert('발행 실패');
+    } catch (error: any) {
+      console.error('Publish error:', error);
+      const detail = error.response?.data?.detail || error.message || '발행 실패';
+      alert(`발행 실패:\n${detail}`);
     } finally {
       setPublishing(false);
     }
@@ -112,23 +139,27 @@ export default function ArticleEditor({ article, onUpdate, onBack, onPublish }: 
         <p className="text-gray-500 mt-2">키워드: {article.keyword}</p>
       </div>
 
-      {/* 글 길이 조절 */}
+      {/* 글 정보 & 길이 조절 */}
       <div className="bg-white rounded-lg shadow p-4 flex items-center justify-between">
-        <span>글 길이: {targetLength.toLocaleString()}자</span>
+        <div className="flex items-center gap-4">
+          <span className="font-medium">글 길이: {contentLength.toLocaleString()}자</span>
+          <span className="text-sm text-gray-500">카테고리: {article.category || '트렌드'}</span>
+          {article.has_coupang && <span className="text-sm text-orange-500">쿠팡 포함</span>}
+        </div>
         <div className="flex gap-2">
           <button
             onClick={() => handleAdjustLength('decrease')}
             disabled={loading}
-            className="px-3 py-1 bg-gray-100 rounded disabled:opacity-50"
+            className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50"
           >
-            - 줄이기
+            {loading ? '처리중...' : '- 줄이기'}
           </button>
           <button
             onClick={() => handleAdjustLength('increase')}
             disabled={loading}
-            className="px-3 py-1 bg-gray-100 rounded disabled:opacity-50"
+            className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50"
           >
-            + 늘리기
+            {loading ? '처리중...' : '+ 늘리기'}
           </button>
         </div>
       </div>

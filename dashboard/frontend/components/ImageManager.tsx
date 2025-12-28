@@ -27,14 +27,26 @@ export default function ImageManager({ image, articleId, onUpdate }: ImageManage
     try {
       const res = await axios.post(`${API_URL}/api/images/replace`, {
         article_id: articleId,
-        image_id: image.id,
+        section_id: image.id,
         action,
-        query
+        query,
+        url: action === 'screenshot' ? query : undefined
       });
-      onUpdate(res.data.image || { ...image, status: 'updated' });
+
+      if (res.data.success && res.data.image) {
+        onUpdate({ ...image, ...res.data.image, status: 'success' });
+        alert('이미지가 교체되었습니다.');
+      } else if (action === 'delete') {
+        onUpdate({ ...image, url: null, status: 'deleted' });
+      } else {
+        alert(res.data.error || '이미지 처리 실패');
+      }
       setShowOptions(false);
-    } catch (error) {
-      alert('이미지 처리 실패');
+      setPexelsQuery('');
+      setScreenshotUrl('');
+    } catch (error: any) {
+      console.error('Image action error:', error);
+      alert(error.response?.data?.detail || '이미지 처리 실패');
     } finally {
       setLoading(false);
     }
