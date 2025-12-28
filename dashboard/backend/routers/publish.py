@@ -16,6 +16,45 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/publish", tags=["publish"])
 
 
+@router.get("/stats")
+async def get_publish_stats():
+    """
+    발행 통계 조회
+
+    오늘, 이번 주, 전체 발행 수 반환
+    """
+    from dashboard.backend.routers.articles import articles_store
+    from datetime import datetime, timedelta
+
+    now = datetime.now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start = today_start - timedelta(days=now.weekday())
+
+    today_published = 0
+    this_week = 0
+    total_published = 0
+    drafts = 0
+
+    for article in articles_store.values():
+        created_at = datetime.fromisoformat(article["created_at"])
+
+        if article["status"] == "published":
+            total_published += 1
+            if created_at >= today_start:
+                today_published += 1
+            if created_at >= week_start:
+                this_week += 1
+        else:
+            drafts += 1
+
+    return {
+        "today_published": today_published,
+        "this_week": this_week,
+        "total_published": total_published,
+        "drafts": drafts
+    }
+
+
 @router.post("/", response_model=PublishResponse)
 async def publish_article(request: PublishRequest):
     """

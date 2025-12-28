@@ -12,6 +12,19 @@ class ArticleCreate(BaseModel):
     """글 생성 요청"""
     keyword: str
     mode: str = "semi"  # "semi" or "evergreen"
+    is_evergreen: bool = False  # 프론트엔드 호환용
+
+
+class AdjustLengthRequest(BaseModel):
+    """글 길이 조절 요청"""
+    target_length: str  # "short" or "long"
+
+
+class AdjustLengthResponse(BaseModel):
+    """글 길이 조절 응답"""
+    success: bool
+    new_length: int = 0
+    error: Optional[str] = None
 
 
 class Section(BaseModel):

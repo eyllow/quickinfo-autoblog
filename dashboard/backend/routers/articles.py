@@ -21,6 +21,8 @@ from dashboard.backend.models import (
     SectionEditRequest,
     SectionEditResponse,
     KeywordSuggestion,
+    AdjustLengthRequest,
+    AdjustLengthResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -80,8 +82,8 @@ async def generate_article(request: ArticleCreate):
 
         generator = ContentGenerator()
 
-        # 에버그린 모드 확인
-        is_evergreen = request.mode == "evergreen" or generator.is_evergreen_keyword(request.keyword)
+        # 에버그린 모드 확인 (is_evergreen 또는 mode로 판단)
+        is_evergreen = request.is_evergreen or request.mode == "evergreen" or generator.is_evergreen_keyword(request.keyword)
 
         # 실제 글 생성
         post = generator.generate_full_post(
@@ -331,3 +333,71 @@ async def get_keyword_suggestions():
     except Exception as e:
         logger.error(f"Keyword suggestions failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{article_id}/adjust-length", response_model=AdjustLengthResponse)
+async def adjust_article_length(article_id: str, request: AdjustLengthRequest):
+    """
+    글 길이 조절
+
+    target_length: "short" (줄이기) 또는 "long" (늘리기)
+    """
+    if article_id not in articles_store:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    article = articles_store[article_id]
+    current_length = len(article["raw_content"])
+
+    try:
+        generator = ContentGenerator()
+
+        if request.target_length == "short":
+            target = int(current_length * 0.7)
+            instruction = "내용을 더 간결하게 요약하고, 핵심만 남겨주세요. 약 30% 줄여주세요."
+        else:  # long
+            target = int(current_length * 1.3)
+            instruction = "내용을 더 상세하게 보충하고, 예시나 설명을 추가해주세요. 약 30% 늘려주세요."
+
+        edit_prompt = f"""다음 블로그 글을 수정해주세요.
+
+[원본 내용]
+{article["raw_content"]}
+
+[수정 요청]
+{instruction}
+
+[키워드]
+{article["keyword"]}
+
+[규칙]
+1. HTML 형식 유지
+2. 자연스럽고 친근한 어투 유지
+3. 수정된 HTML 내용만 출력 (다른 설명 없이)
+4. 원본 구조(h2, p 태그 등) 유지
+"""
+
+        edited_content = generator._call_claude(edit_prompt, max_tokens=8000)
+
+        # HTML 코드 블록 제거
+        edited_content = re.sub(r'^```html\s*', '', edited_content, flags=re.MULTILINE)
+        edited_content = re.sub(r'\s*```$', '', edited_content, flags=re.MULTILINE)
+        edited_content = edited_content.strip()
+
+        # 업데이트
+        article["raw_content"] = edited_content
+        article["sections"] = [s.model_dump() for s in parse_sections(edited_content)]
+
+        new_length = len(edited_content)
+        logger.info(f"Article length adjusted: {current_length} -> {new_length}")
+
+        return AdjustLengthResponse(
+            success=True,
+            new_length=new_length
+        )
+
+    except Exception as e:
+        logger.error(f"Adjust length failed: {e}")
+        return AdjustLengthResponse(
+            success=False,
+            error=str(e)
+        )
