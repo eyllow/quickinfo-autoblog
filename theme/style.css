@@ -1,0 +1,179 @@
+/*
+Theme Name: QuickInfo Theme
+Theme URI: https://quickinfo.kr
+Description: QuickInfo 맞춤형 테마
+Author: QuickInfo
+Author URI: https://quickinfo.kr
+Template: twentytwentyfive
+Version: 1.0.1
+Text Domain: quickinfo-theme
+*/
+
+/* ===== 기본 레이아웃 ===== */
+body {
+    background-color: #ffffff !important;
+    color: #1a1a1a !important;
+}
+
+.wp-site-blocks {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* ===== 헤더 스타일 ===== */
+.wp-block-template-part.site-header,
+header.wp-block-template-part {
+    background-color: #ffffff !important;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 15px 0;
+}
+
+/* 사이트 제목 */
+.wp-block-site-title a {
+    color: #1a1a1a !important;
+    font-weight: 700;
+    font-size: 24px;
+    text-decoration: none;
+}
+
+/* 네비게이션 메뉴 */
+.wp-block-navigation a {
+    color: #4b5563 !important;
+    font-weight: 500;
+}
+
+.wp-block-navigation a:hover {
+    color: #2563eb !important;
+}
+
+/* ===== 메인 콘텐츠 ===== */
+.wp-block-post-title {
+    color: #1a1a1a !important;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.wp-block-post-title a {
+    color: #1a1a1a !important;
+    text-decoration: none;
+}
+
+.wp-block-post-title a:hover {
+    color: #2563eb !important;
+}
+
+/* 포스트 날짜 */
+.wp-block-post-date {
+    color: #6b7280 !important;
+    font-size: 14px;
+}
+
+/* 포스트 내용 */
+.wp-block-post-content,
+.entry-content {
+    color: #374151 !important;
+    line-height: 1.8;
+}
+
+/* ===== 특성 이미지 (빈 공간 해결) ===== */
+.wp-block-post-featured-image {
+    margin-bottom: 20px;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* 특성 이미지 없을 때 빈 공간 숨기기 */
+.wp-block-post-featured-image:empty,
+.wp-block-post-featured-image img[src=""],
+.wp-block-post-featured-image:not(:has(img)) {
+    display: none !important;
+}
+
+/* 이미지 플레이스홀더 숨기기 */
+figure.wp-block-post-featured-image:not(:has(img)),
+.wp-block-post-featured-image figure:empty {
+    display: none !important;
+}
+
+/* ===== 카드형 포스트 목록 ===== */
+.wp-block-post-template {
+    gap: 30px;
+}
+
+.wp-block-post {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 20px;
+    transition: box-shadow 0.2s ease;
+}
+
+.wp-block-post:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* ===== 푸터 스타일 (밝은 버전) ===== */
+.wp-block-template-part.site-footer,
+footer.wp-block-template-part {
+    background-color: #1e293b !important;
+    color: #ffffff !important;
+    padding: 40px 20px;
+    margin-top: 60px;
+}
+
+.site-footer a,
+footer a {
+    color: #ffffff !important;
+    text-decoration: none;
+}
+
+.site-footer a:hover,
+footer a:hover {
+    text-decoration: underline;
+}
+
+/* 푸터 저작권 */
+.footer-copyright {
+    color: #94a3b8 !important;
+    font-size: 14px;
+}
+
+/* ===== 페이지네이션 ===== */
+.wp-block-query-pagination {
+    margin-top: 40px;
+    gap: 10px;
+}
+
+.wp-block-query-pagination a {
+    background: #f3f4f6;
+    color: #1a1a1a !important;
+    padding: 8px 16px;
+    border-radius: 6px;
+    text-decoration: none;
+}
+
+.wp-block-query-pagination a:hover {
+    background: #2563eb;
+    color: #ffffff !important;
+}
+
+/* ===== 반응형 ===== */
+@media (max-width: 768px) {
+    .wp-site-blocks {
+        padding: 0 15px;
+    }
+
+    .wp-block-post-title {
+        font-size: 1.25rem;
+    }
+}
+
+/* ===== 다크모드 강제 해제 ===== */
+@media (prefers-color-scheme: dark) {
+    body {
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
+    }
+}
