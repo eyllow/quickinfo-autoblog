@@ -334,7 +334,7 @@ export default function KeywordSelector({ onSelect, loading }: KeywordSelectorPr
               </label>
               <input
                 type="text"
-                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-900 placeholder-gray-500"
                 placeholder="예: 2025년 1인 가구 절세 전략"
                 value={customKeyword}
                 onChange={(e) => setCustomKeyword(e.target.value)}
@@ -349,7 +349,7 @@ export default function KeywordSelector({ onSelect, loading }: KeywordSelectorPr
                 💡 작성 방향 / 포함할 내용 <span className="text-gray-400 text-xs">(선택)</span>
               </label>
               <textarea
-                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none text-gray-900 placeholder-gray-500"
                 placeholder={`예:\n- 연말정산과 연계해서 설명\n- 월세 세액공제 강조\n- 청년 타겟으로 친근하게\n- 국세청 홈택스 링크 포함`}
                 rows={5}
                 value={customDirection}
