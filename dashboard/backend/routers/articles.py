@@ -86,7 +86,7 @@ async def generate_article(request: ArticleCreate):
     """
     # 실시간 로그 임포트
     from dashboard.backend.utils.log_manager import (
-        log_info_sync, log_success_sync, log_error_sync, log_progress_sync
+        log_info, log_success, log_error, log_progress, log_warning
     )
 
     try:
@@ -94,12 +94,12 @@ async def generate_article(request: ArticleCreate):
 
         # 로그: 키워드 선택
         category_str = request.category or "자동 분류"
-        log_info_sync("keyword", f"키워드 선택: '{request.keyword}' (카테고리: {category_str})")
+        await log_info("keyword", f"키워드 선택: '{request.keyword}' (카테고리: {category_str})")
 
         # 직접 작성 모드 확인
         if request.custom_context:
             logger.info(f"Custom context mode: {request.custom_context[:100]}...")
-            log_info_sync("keyword", f"직접 작성 모드: 사용자 방향 적용")
+            await log_info("keyword", f"직접 작성 모드: 사용자 방향 적용")
 
         generator = ContentGenerator()
 
@@ -107,7 +107,7 @@ async def generate_article(request: ArticleCreate):
         is_evergreen = request.is_evergreen or request.mode == "evergreen" or generator.is_evergreen_keyword(request.keyword)
 
         # 로그: 콘텐츠 생성 시작
-        log_progress_sync("generate", "AI 콘텐츠 생성 시작...")
+        await log_progress("generate", "AI 콘텐츠 생성 시작...")
 
         # 실제 글 생성 (섹션 포함)
         # custom_context가 있으면 직접 작성 모드
@@ -119,7 +119,7 @@ async def generate_article(request: ArticleCreate):
         )
 
         # 로그: 콘텐츠 생성 완료
-        log_success_sync("generate", f"콘텐츠 생성 완료 ({len(post.content)}자, 제목: {post.title[:30]}...)")
+        await log_success("generate", f"콘텐츠 생성 완료 ({len(post.content)}자)", {"title": post.title[:30]})
 
         # 고유 ID 생성
         article_id = str(uuid.uuid4())[:8]
@@ -131,7 +131,7 @@ async def generate_article(request: ArticleCreate):
         ] if post.sections else []
 
         # 로그: 섹션 처리
-        log_info_sync("generate", f"섹션 분리 완료: {len(sections_dict)}개 섹션")
+        await log_info("generate", f"섹션 분리 완료: {len(sections_dict)}개 섹션")
 
         # 호환성을 위해 기존 Section 모델도 생성
         legacy_sections = []
@@ -170,7 +170,7 @@ async def generate_article(request: ArticleCreate):
         logger.info(f"Article generated successfully: {article_id} - {post.title} ({len(sections_dict)} sections)")
 
         # 로그: 완료
-        log_success_sync("generate", f"글 생성 완료! (ID: {article_id})")
+        await log_success("generate", f"글 생성 완료! (ID: {article_id})")
 
         return ArticleResponse(
             id=article_id,
@@ -188,7 +188,7 @@ async def generate_article(request: ArticleCreate):
 
     except Exception as e:
         logger.error(f"Article generation failed: {e}")
-        log_error_sync("generate", f"글 생성 실패: {str(e)}")
+        await log_error("generate", f"글 생성 실패: {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"글 생성 실패: {str(e)}")
