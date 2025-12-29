@@ -54,12 +54,14 @@ def save_settings(settings: SettingsModel):
         json.dump(settings.model_dump(), f, ensure_ascii=False, indent=2)
 
 
+@router.get("", response_model=SettingsModel)
 @router.get("/", response_model=SettingsModel)
 async def get_settings():
     """현재 설정 조회"""
     return load_settings()
 
 
+@router.put("", response_model=SettingsModel)
 @router.put("/", response_model=SettingsModel)
 async def update_settings(settings: SettingsModel):
     """설정 업데이트"""
