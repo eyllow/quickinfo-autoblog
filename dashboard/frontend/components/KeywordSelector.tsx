@@ -12,8 +12,14 @@ interface Keyword {
   source: string;
 }
 
+interface CustomGenerateOptions {
+  keyword: string;
+  category?: string;
+  custom_context?: string;  // 직접 작성 시 작성 방향
+}
+
 interface KeywordSelectorProps {
-  onSelect: (keyword: string, category?: string) => void;
+  onSelect: (keyword: string, category?: string, options?: CustomGenerateOptions) => void;
   loading: boolean;
 }
 
@@ -23,6 +29,7 @@ export default function KeywordSelector({ onSelect, loading }: KeywordSelectorPr
   const [evergreenKeywords, setEvergreenKeywords] = useState<Keyword[]>([]);
   const [customKeyword, setCustomKeyword] = useState('');
   const [customCategory, setCustomCategory] = useState('생활');
+  const [customDirection, setCustomDirection] = useState('');  // 작성 방향
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [generatingKeyword, setGeneratingKeyword] = useState<string | null>(null);
@@ -109,11 +116,22 @@ export default function KeywordSelector({ onSelect, loading }: KeywordSelectorPr
   // 직접 입력으로 글 생성
   const handleCustomSubmit = () => {
     if (!customKeyword.trim()) {
-      alert('키워드를 입력해주세요.');
+      alert('주제를 입력해주세요.');
       return;
     }
-    setGeneratingKeyword(customKeyword.trim());
-    onSelect(customKeyword.trim(), customCategory);
+    const keyword = customKeyword.trim();
+    setGeneratingKeyword(keyword);
+
+    // custom_context가 있으면 옵션으로 전달
+    if (customDirection.trim()) {
+      onSelect(keyword, customCategory, {
+        keyword,
+        category: customCategory,
+        custom_context: customDirection.trim()
+      });
+    } else {
+      onSelect(keyword, customCategory);
+    }
   };
 
   // 트렌드 스코어 렌더링
@@ -304,18 +322,20 @@ export default function KeywordSelector({ onSelect, loading }: KeywordSelectorPr
       {/* 직접 입력 */}
       {activeTab === 'custom' && (
         <div>
-          <p className="text-sm text-gray-500 mb-4">원하는 키워드로 직접 글 생성</p>
+          <p className="text-sm text-gray-500 mb-4">
+            원하는 주제와 작성 방향을 입력하면 AI가 맞춤형 블로그 글을 생성합니다.
+          </p>
 
           <div className="space-y-4">
-            {/* 키워드 입력 */}
+            {/* 주제 입력 (필수) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                키워드
+                📝 주제 <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-                placeholder="예: 2025 연말정산, 청년도약계좌 조건"
+                placeholder="예: 2025년 1인 가구 절세 전략"
                 value={customKeyword}
                 onChange={(e) => setCustomKeyword(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && !loading && handleCustomSubmit()}
@@ -323,10 +343,28 @@ export default function KeywordSelector({ onSelect, loading }: KeywordSelectorPr
               />
             </div>
 
+            {/* 작성 방향 (선택) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                💡 작성 방향 / 포함할 내용 <span className="text-gray-400 text-xs">(선택)</span>
+              </label>
+              <textarea
+                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+                placeholder={`예:\n- 연말정산과 연계해서 설명\n- 월세 세액공제 강조\n- 청년 타겟으로 친근하게\n- 국세청 홈택스 링크 포함`}
+                rows={5}
+                value={customDirection}
+                onChange={(e) => setCustomDirection(e.target.value)}
+                disabled={loading}
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                작성 방향을 입력하면 AI가 해당 내용을 반영하여 글을 작성합니다.
+              </p>
+            </div>
+
             {/* 카테고리 선택 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                카테고리
+                🏷️ 카테고리
               </label>
               <div className="flex flex-wrap gap-2">
                 {categories.map((cat) => (
@@ -348,16 +386,23 @@ export default function KeywordSelector({ onSelect, loading }: KeywordSelectorPr
 
             {/* 글 생성 버튼 */}
             <button
-              className="w-full py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className={`w-full py-3 rounded-lg font-medium transition-all ${
+                !customKeyword.trim() || loading
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700'
+              }`}
               onClick={handleCustomSubmit}
               disabled={loading || !customKeyword.trim()}
             >
               {isKeywordGenerating(customKeyword.trim()) ? (
                 <span className="flex items-center justify-center gap-2">
-                  <span className="animate-spin">⟳</span>
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
                   글 생성 중...
                 </span>
-              ) : '이 키워드로 글 생성하기'}
+              ) : '✨ 글 생성하기'}
             </button>
           </div>
         </div>

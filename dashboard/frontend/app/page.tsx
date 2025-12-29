@@ -25,15 +25,34 @@ export default function Dashboard() {
     });
   }, []);
 
-  const handleKeywordSelect = async (keyword: string) => {
+  // 키워드 선택 핸들러 - 직접 작성 모드 지원
+  interface CustomGenerateOptions {
+    keyword: string;
+    category?: string;
+    custom_context?: string;
+  }
+
+  const handleKeywordSelect = async (keyword: string, category?: string, options?: CustomGenerateOptions) => {
     setSelectedKeyword(keyword);
     setLoading(true);
 
     try {
-      const res = await axios.post(`${API_URL}/api/articles/generate`, {
+      // 요청 본문 구성
+      const requestBody: any = {
         keyword,
         is_evergreen: false
-      });
+      };
+
+      // 직접 작성 모드: 카테고리 및 작성 방향 추가
+      if (options?.custom_context) {
+        requestBody.category = options.category || category;
+        requestBody.custom_context = options.custom_context;
+        console.log('직접 작성 모드:', requestBody);
+      } else if (category) {
+        requestBody.category = category;
+      }
+
+      const res = await axios.post(`${API_URL}/api/articles/generate`, requestBody);
       setArticle(res.data);
       setStep('editing');
     } catch (error) {

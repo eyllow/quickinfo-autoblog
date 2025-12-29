@@ -854,7 +854,9 @@ class ContentGenerator:
     def generate_full_post(
         self,
         keyword: str,
-        news_data: str = ""
+        news_data: str = "",
+        custom_context: str = None,
+        force_category: str = None
     ) -> GeneratedPost:
         """
         카테고리별 전체 블로그 포스트 생성
@@ -862,28 +864,55 @@ class ContentGenerator:
         Args:
             keyword: 키워드
             news_data: 뉴스 요약 데이터
+            custom_context: 사용자 지정 작성 방향 (직접 작성 모드)
+            force_category: 강제 카테고리 지정 (직접 작성 모드)
 
         Returns:
             GeneratedPost 객체
         """
         print("\n" + "=" * 60)
         print("📝 블로그 글 생성 프로세스 시작")
+        if custom_context:
+            print("   [직접 작성 모드]")
         print("=" * 60)
 
         # Step 1: 키워드 분석 및 카테고리 분류
         print(f"\n[Step 1/8] 키워드 분석")
         print(f"  └─ 키워드: {keyword}")
-        category_name, category_config = self.classify_category(keyword)
+
+        # 직접 작성 모드에서는 사용자 지정 카테고리 우선
+        if force_category:
+            category_name = force_category
+            category_config = self.categories_config.get("categories", {}).get(force_category, {})
+            if not category_config:
+                # 기본 설정 사용
+                category_config = {"template": "trend", "requires_coupang": False}
+            print(f"  └─ 카테고리: {category_name} (사용자 지정)")
+        else:
+            category_name, category_config = self.classify_category(keyword)
+            print(f"  └─ 카테고리: {category_name}")
+
         template_name = category_config.get("template", "trend")
         is_evergreen = self.is_evergreen_keyword(keyword)
         print(f"  └─ 에버그린: {'✅ Yes' if is_evergreen else '❌ No'}")
-        print(f"  └─ 카테고리: {category_name}")
         print(f"  └─ 템플릿: {template_name}")
 
-        # Step 1.5: 트렌드 맥락 수집 (왜 지금 이 키워드가 화제인지)
+        # Step 1.5: 트렌드 맥락 수집 또는 사용자 지정 맥락 사용
         print(f"\n[Step 1.5/8] 트렌드 맥락 수집")
         trend_context = ""
-        if category_name == "트렌드" or not is_evergreen:
+
+        if custom_context:
+            # 직접 작성 모드: 사용자 입력을 트렌드 맥락으로 사용
+            trend_context = f"""
+[작성 방향 - 사용자 요청]
+{custom_context}
+
+중요: 위 작성 방향에 맞춰서 글을 작성해주세요.
+사용자가 요청한 톤, 스타일, 포함할 내용을 반드시 반영하세요.
+"""
+            print(f"  ✅ 사용자 지정 작성 방향 적용")
+            print(f"     {custom_context[:80]}...")
+        elif category_name == "트렌드" or not is_evergreen:
             trend_context = self.get_trend_context(keyword)
             if trend_context:
                 print(f"  ✅ 트렌드 맥락 수집 완료 (뉴스 기반)")

@@ -81,9 +81,15 @@ async def generate_article(request: ArticleCreate):
 
     ContentGenerator를 사용하여 고품질 콘텐츠 생성
     섹션은 ContentGenerator에서 직접 파싱하여 반환
+
+    custom_context가 있으면 "직접 작성" 모드로 사용자 지정 방향 반영
     """
     try:
         logger.info(f"Generating article for keyword: {request.keyword}")
+
+        # 직접 작성 모드 확인
+        if request.custom_context:
+            logger.info(f"Custom context mode: {request.custom_context[:100]}...")
 
         generator = ContentGenerator()
 
@@ -91,9 +97,12 @@ async def generate_article(request: ArticleCreate):
         is_evergreen = request.is_evergreen or request.mode == "evergreen" or generator.is_evergreen_keyword(request.keyword)
 
         # 실제 글 생성 (섹션 포함)
+        # custom_context가 있으면 직접 작성 모드
         post = generator.generate_full_post(
             keyword=request.keyword,
-            news_data=""  # 대시보드에서는 뉴스 데이터 없이 생성
+            news_data="",  # 대시보드에서는 뉴스 데이터 없이 생성
+            custom_context=request.custom_context,  # 사용자 작성 방향
+            force_category=request.category  # 사용자 지정 카테고리
         )
 
         # 고유 ID 생성

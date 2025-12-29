@@ -13,6 +13,8 @@ class ArticleCreate(BaseModel):
     keyword: str
     mode: str = "semi"  # "semi" or "evergreen"
     is_evergreen: bool = False  # 프론트엔드 호환용
+    category: Optional[str] = None  # 직접 작성 시 카테고리 지정
+    custom_context: Optional[str] = None  # 직접 작성 시 작성 방향
 
 
 class AdjustLengthRequest(BaseModel):
