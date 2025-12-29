@@ -3,18 +3,27 @@
  * Mixed Content 에러 방지를 위해 프로토콜을 명시적으로 처리
  */
 
-const getApiUrl = (): string => {
-  // 1. 환경변수 우선 (빌드 시점에 주입됨)
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
+const ensureHttps = (url: string): string => {
+  // 프로덕션 도메인에서는 항상 HTTPS 강제
+  if (url.includes('admin.quickinfo.kr') || url.includes('quickinfo.kr')) {
+    return url.replace(/^http:\/\//i, 'https://');
   }
+  return url;
+};
 
-  // 2. 브라우저 환경에서는 현재 origin 사용 (프로토콜 포함)
+const getApiUrl = (): string => {
+  // 1. 브라우저 환경에서는 현재 origin 사용 (가장 안전)
   if (typeof window !== 'undefined') {
+    // 현재 페이지가 HTTPS면 API도 HTTPS로
     return window.location.origin;
   }
 
-  // 3. 서버 사이드 폴백
+  // 2. 환경변수 (서버사이드 렌더링용)
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return ensureHttps(process.env.NEXT_PUBLIC_API_URL);
+  }
+
+  // 3. 폴백
   return 'https://admin.quickinfo.kr';
 };
 
