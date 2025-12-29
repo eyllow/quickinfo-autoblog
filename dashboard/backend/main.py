@@ -5,6 +5,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 
 # 프로젝트 루트 경로 설정
 import sys
@@ -36,8 +38,22 @@ app = FastAPI(
     title="QuickInfo Dashboard API",
     description="블로그 자동 발행 대시보드 API",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    redirect_slashes=False  # 307 리다이렉트 방지
 )
+
+# 프록시 헤더 처리 미들웨어 (Apache/Nginx 뒤에서 HTTPS 인식)
+class ProxyHeadersMiddleware(BaseHTTPMiddleware):
+    """Apache/Nginx 리버스 프록시 뒤에서 HTTPS 스킴 올바르게 인식"""
+    async def dispatch(self, request: Request, call_next):
+        # X-Forwarded-Proto 헤더가 https면 스킴 변경
+        if request.headers.get("x-forwarded-proto") == "https":
+            request.scope["scheme"] = "https"
+        response = await call_next(request)
+        return response
+
+# 미들웨어 등록 순서: 나중에 등록된 것이 먼저 실행됨
+# ProxyHeaders → CORS 순서로 실행되도록 CORS 먼저 등록
 
 # CORS 설정
 app.add_middleware(
@@ -48,12 +64,17 @@ app.add_middleware(
         "http://localhost:8080",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
+        "https://admin.quickinfo.kr",
+        "http://admin.quickinfo.kr",
         "*"  # 개발용 - 프로덕션에서는 제거
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 프록시 헤더 미들웨어 추가
+app.add_middleware(ProxyHeadersMiddleware)
 
 # 라우터 등록
 app.include_router(articles_router, prefix="/api")
