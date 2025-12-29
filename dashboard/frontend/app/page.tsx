@@ -6,6 +6,7 @@ import ModeToggle from '@/components/ModeToggle';
 import KeywordSelector from '@/components/KeywordSelector';
 import ArticleEditor from '@/components/ArticleEditor';
 import PublishStats from '@/components/PublishStats';
+import LogPanel from '@/components/LogPanel';
 import { getApiUrl } from '@/lib/api';
 
 export default function Dashboard() {
@@ -89,6 +90,9 @@ export default function Dashboard() {
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* 통계 */}
         <PublishStats />
+
+        {/* 실시간 로그 패널 */}
+        <LogPanel />
 
         {/* 반자동 모드 */}
         {mode === 'semi-auto' && (

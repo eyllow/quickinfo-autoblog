@@ -16,6 +16,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from dashboard.backend.routers import articles_router, publish_router, images_router, sections_router
 from dashboard.backend.routers.keywords import router as keywords_router
 from dashboard.backend.routers.settings import router as settings_router
+from dashboard.backend.routers.logs import router as logs_router
 
 # 로깅 설정
 logging.basicConfig(
@@ -83,6 +84,7 @@ app.include_router(images_router, prefix="/api")
 app.include_router(sections_router, prefix="/api")
 app.include_router(keywords_router, prefix="/api/keywords", tags=["keywords"])
 app.include_router(settings_router, prefix="/api/settings", tags=["settings"])
+app.include_router(logs_router, prefix="/api", tags=["logs"])
 
 
 @app.get("/")
