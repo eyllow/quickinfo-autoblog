@@ -10,6 +10,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))
 
+from dashboard.backend.utils.log_manager import (
+    log_info_sync, log_success_sync, log_progress_sync, log_warning_sync
+)
+
 router = APIRouter()
 
 
@@ -102,6 +106,8 @@ async def get_evergreen_keywords():
 async def refresh_keywords(request: RefreshRequest = RefreshRequest()):
     """키워드 새로고침 (트렌드 또는 에버그린)"""
     try:
+        log_progress_sync("keyword", f"키워드 새로고침 시작 (유형: {request.type})")
+
         if request.type == "evergreen":
             # 에버그린: 하드코딩된 키워드 랜덤 셔플
             import random
@@ -118,6 +124,8 @@ async def refresh_keywords(request: RefreshRequest = RefreshRequest()):
                 {"keyword": "종합소득세 신고", "category": "에버그린"},
             ]
             random.shuffle(evergreen_list)
+            result_keywords = evergreen_list[:10]
+            log_success_sync("keyword", f"에버그린 키워드 {len(result_keywords)}개 로드 완료")
             return {
                 "success": True,
                 "keywords": [
@@ -127,15 +135,19 @@ async def refresh_keywords(request: RefreshRequest = RefreshRequest()):
                         "category": kw["category"],
                         "source": "evergreen"
                     }
-                    for kw in evergreen_list[:10]
+                    for kw in result_keywords
                 ]
             }
         else:
             # 트렌드: Google Trends에서 새로 가져오기
+            log_progress_sync("keyword", "Google Trends에서 트렌드 키워드 수집 중...")
             from crawlers.google_trends import GoogleTrendsCrawler
 
             crawler = GoogleTrendsCrawler()
             trend_data = crawler.get_trending_keywords()  # 파라미터 없이 호출
+
+            result_count = len(trend_data[:10])
+            log_success_sync("keyword", f"트렌드 키워드 {result_count}개 수집 완료")
 
             return {
                 "success": True,
@@ -153,6 +165,7 @@ async def refresh_keywords(request: RefreshRequest = RefreshRequest()):
         print(f"키워드 새로고침 오류: {e}")
         import traceback
         traceback.print_exc()
+        log_warning_sync("keyword", f"키워드 수집 실패, 기본 키워드 사용: {str(e)}")
         # 실패해도 기본 키워드 반환
         return {
             "success": True,

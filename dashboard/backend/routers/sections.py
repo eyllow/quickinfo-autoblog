@@ -16,6 +16,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from config.settings import settings
+from dashboard.backend.utils.log_manager import (
+    log_info_sync, log_success_sync, log_error_sync, log_progress_sync
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/sections", tags=["sections"])
@@ -86,6 +89,7 @@ async def edit_section(request: SectionEditRequest):
     핵심: 해당 섹션만 수정하고 반환, 다른 섹션은 절대 건드리지 않음
     """
     try:
+        log_progress_sync("generate", f"섹션 {request.section_id} AI 수정 중...")
         client = anthropic.Anthropic(api_key=settings.claude_api_key)
 
         type_labels = {
@@ -143,6 +147,7 @@ async def edit_section(request: SectionEditRequest):
                 updated_html = f"<p>{updated_html}</p>"
 
         logger.info(f"Section {request.section_id} edited successfully")
+        log_success_sync("generate", f"섹션 {request.section_id} 수정 완료")
 
         return SectionEditResponse(
             success=True,
@@ -152,6 +157,7 @@ async def edit_section(request: SectionEditRequest):
 
     except Exception as e:
         logger.error(f"Section edit failed: {e}")
+        log_error_sync("generate", f"섹션 수정 실패: {str(e)}")
         return SectionEditResponse(
             success=False,
             section_id=request.section_id,
@@ -168,6 +174,8 @@ async def capture_screenshot(request: ScreenshotRequest):
     키워드가 주어지면 URL 매핑에서 찾아서 캡처
     """
     try:
+        log_progress_sync("image", "스크린샷 캡처 준비 중...")
+
         # 키워드로 URL 찾기
         url = request.url
         keyword_match = None
@@ -180,11 +188,13 @@ async def capture_screenshot(request: ScreenshotRequest):
                     break
 
         if not url:
+            log_error_sync("image", f"URL을 찾을 수 없습니다: {request.keyword}")
             return ScreenshotResponse(
                 success=False,
                 error=f"URL을 찾을 수 없습니다. 지원되는 키워드: {', '.join(URL_MAPPING.keys())}"
             )
 
+        log_info_sync("image", f"스크린샷 캡처 시도: {url}")
         logger.info(f"Capturing screenshot: {url} (keyword: {keyword_match or 'N/A'})")
 
         # Puppeteer 스크린샷 캡처
@@ -197,10 +207,14 @@ async def capture_screenshot(request: ScreenshotRequest):
             screenshot_path = capture_url(url)
 
         if not screenshot_path or not Path(screenshot_path).exists():
+            log_error_sync("image", "스크린샷 캡처 실패")
             return ScreenshotResponse(
                 success=False,
                 error="스크린샷 캡처 실패"
             )
+
+        log_success_sync("image", f"스크린샷 캡처 완료: {Path(screenshot_path).name}")
+        log_progress_sync("image", "WordPress에 이미지 업로드 중...")
 
         # WordPress에 업로드
         try:
@@ -212,12 +226,14 @@ async def capture_screenshot(request: ScreenshotRequest):
             )
         except Exception as e:
             logger.error(f"WordPress upload failed: {e}")
+            log_error_sync("image", f"이미지 업로드 실패: {str(e)}")
             return ScreenshotResponse(
                 success=False,
                 error=f"이미지 업로드 실패: {str(e)}"
             )
 
         if not image_url:
+            log_error_sync("image", "이미지 업로드 실패")
             return ScreenshotResponse(
                 success=False,
                 error="이미지 업로드 실패"
@@ -231,6 +247,7 @@ async def capture_screenshot(request: ScreenshotRequest):
 </figure>'''
 
         logger.info(f"Screenshot captured and uploaded: {image_url}")
+        log_success_sync("image", f"스크린샷 업로드 완료: {keyword_match or url}")
 
         return ScreenshotResponse(
             success=True,
@@ -240,6 +257,7 @@ async def capture_screenshot(request: ScreenshotRequest):
 
     except Exception as e:
         logger.error(f"Screenshot capture failed: {e}")
+        log_error_sync("image", f"스크린샷 처리 실패: {str(e)}")
         return ScreenshotResponse(
             success=False,
             error=str(e)

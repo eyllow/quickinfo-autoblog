@@ -16,6 +16,9 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from publishers.wordpress import WordPressPublisher, generate_tags
 from dashboard.backend.models import PublishRequest, PublishResponse
+from dashboard.backend.utils.log_manager import (
+    log_info_sync, log_success_sync, log_error_sync, log_progress_sync
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/publish", tags=["publish"])
@@ -126,8 +129,11 @@ async def publish_article(request: PublishRequest):
         raise HTTPException(status_code=404, detail="Article not found")
 
     article = articles_store[request.article_id]
+    title_short = article["title"][:30] + "..." if len(article["title"]) > 30 else article["title"]
 
     try:
+        log_progress_sync("publish", f"WordPress 발행 준비 중: {title_short}")
+
         publisher = WordPressPublisher()
 
         # 태그 생성
@@ -135,6 +141,8 @@ async def publish_article(request: PublishRequest):
             keyword=article["keyword"],
             category=article.get("category", "트렌드")
         )
+
+        log_info_sync("publish", f"카테고리: {article.get('category', '트렌드')}, 상태: {request.status}")
 
         # 실제 발행
         result = publisher.publish_post(
@@ -174,6 +182,7 @@ async def publish_article(request: PublishRequest):
                 logger.error(f"DB 기록 실패: {db_error}")
 
             logger.info(f"Article published: {result.url}")
+            log_success_sync("publish", f"✨ 발행 완료! Post ID: {result.post_id}", {"url": result.url})
 
             return PublishResponse(
                 success=True,
@@ -183,6 +192,7 @@ async def publish_article(request: PublishRequest):
         else:
             error_msg = result.error or "WordPress 발행 실패"
             logger.error(f"Publish failed: {error_msg}")
+            log_error_sync("publish", f"발행 실패: {error_msg}")
             return PublishResponse(
                 success=False,
                 error=error_msg
@@ -192,6 +202,7 @@ async def publish_article(request: PublishRequest):
         import traceback
         error_detail = traceback.format_exc()
         logger.error(f"Publish error: {e}\n{error_detail}")
+        log_error_sync("publish", f"발행 오류: {str(e)}")
         raise HTTPException(status_code=500, detail=f"발행 실패: {str(e)}\n{error_detail}")
 
 

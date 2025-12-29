@@ -12,11 +12,11 @@ interface LogEntry {
 }
 
 const STAGE_LABELS: Record<string, string> = {
-  keyword: '키워드',
-  context: '맥락 검증',
-  generate: 'AI 생성',
-  image: '이미지',
-  publish: '발행',
+  keyword: '🔑 키워드',
+  context: '🔍 맥락 검증',
+  generate: '🤖 AI 생성',
+  image: '🖼️ 이미지',
+  publish: '📤 발행',
 };
 
 const LEVEL_STYLES: Record<string, { icon: string; color: string }> = {
