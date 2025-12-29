@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import SectionEditor from './SectionEditor';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8003';
+import { API_URL } from '@/lib/api';
 
 interface Section {
   id: string;

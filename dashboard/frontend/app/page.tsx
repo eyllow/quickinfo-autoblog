@@ -6,8 +6,7 @@ import ModeToggle from '@/components/ModeToggle';
 import KeywordSelector from '@/components/KeywordSelector';
 import ArticleEditor from '@/components/ArticleEditor';
 import PublishStats from '@/components/PublishStats';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8003';
+import { API_URL } from '@/lib/api';
 
 export default function Dashboard() {
   const [mode, setMode] = useState<'semi-auto' | 'full-auto'>('semi-auto');

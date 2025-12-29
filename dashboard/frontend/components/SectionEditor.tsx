@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import axios from 'axios';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8003';
+import { API_URL } from '@/lib/api';
 
 interface Section {
   id: string;
