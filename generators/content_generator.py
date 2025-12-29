@@ -192,6 +192,10 @@ class ContentGenerator:
         self.image_fetcher = ImageFetcher()
         self.web_searcher = GoogleSearcher()
 
+        # 트렌드 맥락 수집용 크롤러
+        from crawlers.google_trends import GoogleTrendsCrawler
+        self.trend_crawler = GoogleTrendsCrawler()
+
         # 설정 파일 로드
         self.categories_config = self._load_json("categories.json")
         self.official_links = self._load_json("official_links.json")
@@ -230,6 +234,34 @@ class ContentGenerator:
                 return True
 
         return False
+
+    def get_trend_context(self, keyword: str) -> str:
+        """
+        키워드의 트렌드 맥락 수집 (왜 지금 이 키워드가 화제인지)
+
+        Args:
+            keyword: 검색 키워드
+
+        Returns:
+            트렌드 맥락 문자열 (프롬프트에 삽입용)
+        """
+        try:
+            context = self.trend_crawler.get_trend_context(keyword)
+
+            if context.get("news_titles"):
+                news_list = '\n'.join([f'- {title}' for title in context['news_titles'][:5]])
+                return f"""
+[트렌드 배경 - 이 키워드가 지금 화제인 이유]
+{news_list}
+
+중요: 위 뉴스 내용을 반영하여 "왜 지금 이 키워드가 뜨는지" 설명해주세요.
+단순한 일반론이 아닌, 현재 상황에 맞는 시의성 있는 내용을 작성해주세요.
+"""
+            return ""
+
+        except Exception as e:
+            logger.warning(f"트렌드 맥락 수집 실패: {e}")
+            return ""
 
     def _call_claude(
         self,
@@ -344,7 +376,8 @@ class ContentGenerator:
         template_name: str,
         category_name: str = "트렌드",
         is_evergreen: bool = False,
-        web_data: dict = None
+        web_data: dict = None,
+        trend_context: str = ""
     ) -> tuple[str, list, dict]:
         """
         템플릿 다양화 시스템으로 본문 생성 (저품질 방지)
@@ -356,6 +389,7 @@ class ContentGenerator:
             category_name: 카테고리명
             is_evergreen: 에버그린 콘텐츠 여부
             web_data: 웹검색 결과 (트렌드 키워드용)
+            trend_context: 트렌드 맥락 (왜 지금 이 키워드가 화제인지)
 
         Returns:
             (HTML 본문, 출처 목록, 템플릿 정보) 튜플
@@ -364,11 +398,16 @@ class ContentGenerator:
         sources = []
         web_data_content = ""
 
+        # 트렌드 맥락이 있으면 먼저 추가 (시의성 있는 글 작성을 위해)
+        if trend_context:
+            web_data_content = trend_context + "\n\n"
+            logger.info("Added trend context to prompt")
+
         if web_data and web_data.get("content"):
             web_content = web_data["content"][:6000]  # 토큰 제한 고려
             sources = web_data.get("sources", [])
 
-            web_data_content = f"""
+            web_data_content += f"""
 [웹검색 결과 - 최신 정보 (반드시 이 내용을 바탕으로 작성)]
 {web_content}
 
@@ -379,10 +418,11 @@ class ContentGenerator:
 1. 위 참고 자료의 팩트만 사용하세요
 2. 자료에 없는 내용은 추측하지 마세요
 3. 최신 날짜, 금액, 수치를 정확히 반영하세요
+4. 트렌드 배경이 있다면 "왜 지금 이 키워드가 화제인지" 꼭 언급하세요
 """
             logger.info(f"Added web search data: {len(web_content)} chars from {len(sources)} sources")
         elif news_data:
-            web_data_content = news_data
+            web_data_content += news_data
 
         # 🆕 템플릿 다양화 시스템 사용 (저품질 방지)
         prompt, template_key, template, cta_config = generate_template_prompt(
@@ -831,7 +871,7 @@ class ContentGenerator:
         print("=" * 60)
 
         # Step 1: 키워드 분석 및 카테고리 분류
-        print(f"\n[Step 1/7] 키워드 분석")
+        print(f"\n[Step 1/8] 키워드 분석")
         print(f"  └─ 키워드: {keyword}")
         category_name, category_config = self.classify_category(keyword)
         template_name = category_config.get("template", "trend")
@@ -840,8 +880,23 @@ class ContentGenerator:
         print(f"  └─ 카테고리: {category_name}")
         print(f"  └─ 템플릿: {template_name}")
 
+        # Step 1.5: 트렌드 맥락 수집 (왜 지금 이 키워드가 화제인지)
+        print(f"\n[Step 1.5/8] 트렌드 맥락 수집")
+        trend_context = ""
+        if category_name == "트렌드" or not is_evergreen:
+            trend_context = self.get_trend_context(keyword)
+            if trend_context:
+                print(f"  ✅ 트렌드 맥락 수집 완료 (뉴스 기반)")
+            else:
+                print(f"  ⚠️ 트렌드 맥락 없음")
+        else:
+            print(f"  ℹ️ 에버그린 키워드 - 트렌드 맥락 스킵")
+
+        # 이미지 중복 방지 초기화
+        self.image_fetcher.reset_used_images()
+
         # Step 2: 웹검색 (트렌드 + 에버그린 카테고리 모두 적용)
-        print(f"\n[Step 2/7] 웹검색 실행")
+        print(f"\n[Step 2/8] 웹검색 실행")
 
         # 웹 검색 적용 카테고리 (트렌드 + 에버그린)
         web_search_categories = ["트렌드", "연예", "생활정보", "재테크", "건강", "IT/테크", "취업교육"]
@@ -867,20 +922,23 @@ class ContentGenerator:
             print(f"  └─ 검색 결과: 없음")
 
         # Step 3: 제목 생성
-        print(f"\n[Step 3/7] 제목 생성")
+        print(f"\n[Step 3/8] 제목 생성")
         print(f"  └─ Claude API 호출 중...")
         title = self.generate_title(keyword)
         print(f"  └─ 생성된 제목: {title}")
 
-        # Step 4: 본문 생성 (템플릿 다양화 시스템)
-        print(f"\n[Step 4/7] 본문 생성 (템플릿 다양화)")
+        # Step 4: 본문 생성 (템플릿 다양화 시스템 + 트렌드 맥락)
+        print(f"\n[Step 4/8] 본문 생성 (템플릿 다양화)")
         print(f"  └─ 에버그린: {'✅ Yes' if is_evergreen else '❌ No'}")
+        if trend_context:
+            print(f"  └─ 트렌드 맥락: 포함")
         print(f"  └─ Claude API 호출 중...")
         content, content_sources, template_info = self.generate_content_with_template(
             keyword, news_data, template_name,
             category_name=category_name,
             is_evergreen=is_evergreen,
-            web_data=web_data
+            web_data=web_data,
+            trend_context=trend_context  # 트렌드 맥락 추가
         )
         print(f"  └─ 생성 완료: {len(content)} chars")
         print(f"  └─ 사용된 템플릿: {template_info['name']} ({template_info['key']})")
@@ -892,8 +950,8 @@ class ContentGenerator:
         if not excerpt:
             excerpt = f"{keyword}에 대한 완벽 가이드! 핵심 정보부터 실전 팁까지 한 번에 알아보세요."[:160]
 
-        # Step 6: 후처리 (이미지, 링크, 쿠팡)
-        print(f"\n[Step 5/7] 후처리")
+        # Step 5: 후처리 (이미지, 링크, 쿠팡)
+        print(f"\n[Step 5/8] 후처리")
 
         # 이미지 삽입 (템플릿에서 지정한 이미지 개수 사용)
         image_count = template_info.get('image_count', 4)
@@ -914,8 +972,8 @@ class ContentGenerator:
         else:
             content = content.replace("[DISCLAIMER]", "")
 
-        # Step 7: 쿠팡 처리
-        print(f"\n[Step 6/7] 쿠팡 처리")
+        # Step 6: 쿠팡 처리
+        print(f"\n[Step 6/8] 쿠팡 처리")
         content, has_coupang = self.insert_coupang_products(
             content, keyword, category_config, category_name
         )

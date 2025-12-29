@@ -144,6 +144,15 @@ class ImageFetcher:
         }
         # 카테고리 설정 로드
         self.categories_config = self._load_categories()
+        # 글 단위 중복 방지용 (새 글 생성 시 reset 호출 필요)
+        self.used_image_ids = set()
+        self.used_image_urls = set()
+
+    def reset_used_images(self):
+        """새 글 생성 시 중복 목록 초기화"""
+        self.used_image_ids.clear()
+        self.used_image_urls.clear()
+        logger.info("Image usage tracking reset")
 
     def _load_categories(self) -> dict:
         """카테고리 설정 로드"""
@@ -618,6 +627,126 @@ smartphone technology modern"""
     def _is_english(self, text: str) -> bool:
         """텍스트가 영문인지 확인"""
         return not bool(re.search(r'[가-힣]', text))
+
+    def generate_section_image_keywords(self, keyword: str, sections: list) -> list:
+        """
+        섹션별로 다양한 이미지 검색 키워드 생성 (AI 기반)
+
+        Args:
+            keyword: 메인 키워드
+            sections: 섹션 목록 [{heading: ..., content: ...}, ...]
+
+        Returns:
+            영문 이미지 검색 키워드 리스트
+        """
+        try:
+            client = anthropic.Anthropic(api_key=settings.claude_api_key)
+
+            section_headings = [s.get('heading', s.get('type', '')) for s in sections[:5]]
+
+            prompt = f"""메인 키워드: {keyword}
+섹션 목록:
+{chr(10).join([f"- {h}" for h in section_headings])}
+
+각 섹션에 어울리는 서로 다른 이미지 검색 키워드를 영문으로 생성해주세요.
+키워드는 Pexels에서 검색 가능한 일반적인 영문 단어/구문이어야 합니다.
+
+규칙:
+1. 실제 인물/연예인 이름 절대 포함 금지
+2. 각 키워드는 2~4단어 영문
+3. 서로 다른 이미지가 나오도록 다양하게
+4. 구체적인 사물/장면 키워드
+
+출력: JSON 배열만 (설명 없이)
+["키워드1", "키워드2", "키워드3", ...]"""
+
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=200,
+                messages=[{"role": "user", "content": prompt}]
+            )
+
+            response_text = response.content[0].text.strip()
+
+            # JSON 파싱
+            import json
+            # 코드블록 제거
+            if '```' in response_text:
+                response_text = re.sub(r'```json\s*|\s*```', '', response_text)
+
+            keywords = json.loads(response_text)
+            logger.info(f"Generated section image keywords: {keywords}")
+            return keywords
+
+        except Exception as e:
+            logger.warning(f"Section image keywords generation failed: {e}")
+            # 폴백: 기본 키워드 리스트
+            return [
+                f"{keyword} concept",
+                "modern technology lifestyle",
+                "professional business office",
+                "success achievement goal"
+            ]
+
+    def fetch_images_for_sections(self, image_keywords: list, count_per_keyword: int = 1) -> list:
+        """
+        섹션별로 다른 키워드로 이미지 검색 (중복 완전 방지)
+
+        Args:
+            image_keywords: 영문 검색 키워드 리스트
+            count_per_keyword: 키워드당 이미지 수
+
+        Returns:
+            이미지 정보 딕셔너리 리스트
+        """
+        images = []
+
+        for keyword in image_keywords:
+            # Pexels 검색 (여러 결과 중 미사용 이미지 선택)
+            photos = self.search_pexels_single(keyword, per_page=10)
+
+            image_found = False
+            for photo in photos:
+                photo_id = photo.get("id")
+                img_url = photo.get("src", {}).get("large") or photo.get("src", {}).get("medium", "")
+
+                # 중복 체크
+                if photo_id in self.used_image_ids or img_url in self.used_image_urls:
+                    continue
+
+                images.append({
+                    "id": photo_id,
+                    "url": img_url,
+                    "alt": photo.get("alt", keyword),
+                    "photographer": photo.get("photographer", "Unknown"),
+                    "search_query": keyword
+                })
+                self.used_image_ids.add(photo_id)
+                self.used_image_urls.add(img_url)
+                image_found = True
+                break
+
+            # 검색 실패시 폴백
+            if not image_found:
+                fallback_photos = self.search_pexels_single("modern lifestyle", per_page=10)
+                for photo in fallback_photos:
+                    photo_id = photo.get("id")
+                    img_url = photo.get("src", {}).get("large") or photo.get("src", {}).get("medium", "")
+
+                    if photo_id not in self.used_image_ids and img_url not in self.used_image_urls:
+                        images.append({
+                            "id": photo_id,
+                            "url": img_url,
+                            "alt": "관련 이미지",
+                            "photographer": photo.get("photographer", "Unknown"),
+                            "search_query": "fallback: modern lifestyle"
+                        })
+                        self.used_image_ids.add(photo_id)
+                        self.used_image_urls.add(img_url)
+                        break
+
+        logger.info(f"Fetched {len(images)} diverse images for sections")
+        return images
 
     def _fallback_images(self, keyword: str, count: int = 4) -> dict:
         """폴백 이미지 검색"""
