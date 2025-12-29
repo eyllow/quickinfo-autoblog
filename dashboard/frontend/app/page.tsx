@@ -6,7 +6,7 @@ import ModeToggle from '@/components/ModeToggle';
 import KeywordSelector from '@/components/KeywordSelector';
 import ArticleEditor from '@/components/ArticleEditor';
 import PublishStats from '@/components/PublishStats';
-import { API_URL } from '@/lib/api';
+import { getApiUrl } from '@/lib/api';
 
 export default function Dashboard() {
   const [mode, setMode] = useState<'semi-auto' | 'full-auto'>('semi-auto');
@@ -17,7 +17,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     // 설정 로드
-    axios.get(`${API_URL}/api/settings`).then(res => {
+    axios.get(`${getApiUrl()}/api/settings`).then(res => {
       setMode(res.data.publish_mode === 'auto' ? 'full-auto' : 'semi-auto');
     }).catch(() => {
       // 기본값 사용
@@ -51,7 +51,7 @@ export default function Dashboard() {
         requestBody.category = category;
       }
 
-      const res = await axios.post(`${API_URL}/api/articles/generate`, requestBody);
+      const res = await axios.post(`${getApiUrl()}/api/articles/generate`, requestBody);
       setArticle(res.data);
       setStep('editing');
     } catch (error) {
@@ -64,7 +64,7 @@ export default function Dashboard() {
 
   const handleModeChange = async (newMode: 'semi-auto' | 'full-auto') => {
     try {
-      await axios.post(`${API_URL}/api/settings/mode`, {
+      await axios.post(`${getApiUrl()}/api/settings/mode`, {
         mode: newMode === 'full-auto' ? 'auto' : 'semi'
       });
       setMode(newMode);

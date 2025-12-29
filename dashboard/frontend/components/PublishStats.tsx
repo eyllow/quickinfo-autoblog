@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { API_URL } from '@/lib/api';
+import { getApiUrl } from '@/lib/api';
 
 export default function PublishStats() {
   const [stats, setStats] = useState({
@@ -16,7 +16,7 @@ export default function PublishStats() {
   const fetchStats = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const res = await axios.get(`${API_URL}/api/publish/stats`);
+      const res = await axios.get(`${getApiUrl()}/api/publish/stats`);
       setStats({
         today: res.data.today_published || 0,
         week: res.data.this_week || 0,

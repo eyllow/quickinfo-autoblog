@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import SectionEditor from './SectionEditor';
-import { API_URL } from '@/lib/api';
+import { getApiUrl } from '@/lib/api';
 
 interface Section {
   id: string;
@@ -165,7 +165,7 @@ export default function ArticleEditor({ article: initialArticle, onUpdate, onBac
 
       // content 업데이트 시도
       try {
-        await axios.put(`${API_URL}/api/articles/${article.id}/content`, {
+        await axios.put(`${getApiUrl()}/api/articles/${article.id}/content`, {
           content: fullContent
         });
       } catch (e) {
@@ -173,7 +173,7 @@ export default function ArticleEditor({ article: initialArticle, onUpdate, onBac
       }
 
       // WordPress 발행
-      const response = await axios.post(`${API_URL}/api/publish/`, {
+      const response = await axios.post(`${getApiUrl()}/api/publish/`, {
         article_id: article.id,
         status: 'publish'
       });
@@ -205,7 +205,7 @@ export default function ArticleEditor({ article: initialArticle, onUpdate, onBac
 
       // content 업데이트 시도
       try {
-        await axios.put(`${API_URL}/api/articles/${article.id}/content`, {
+        await axios.put(`${getApiUrl()}/api/articles/${article.id}/content`, {
           content: fullContent
         });
       } catch (e) {
@@ -213,7 +213,7 @@ export default function ArticleEditor({ article: initialArticle, onUpdate, onBac
       }
 
       // Draft로 발행
-      const response = await axios.post(`${API_URL}/api/publish/`, {
+      const response = await axios.post(`${getApiUrl()}/api/publish/`, {
         article_id: article.id,
         status: 'draft'
       });

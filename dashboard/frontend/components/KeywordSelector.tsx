@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { API_URL } from '@/lib/api';
+import { getApiUrl } from '@/lib/api';
 
 interface Keyword {
   keyword: string;
@@ -51,8 +51,8 @@ export default function KeywordSelector({ onSelect, loading }: KeywordSelectorPr
     setIsLoading(true);
     try {
       const [trendingRes, evergreenRes] = await Promise.all([
-        axios.get(`${API_URL}/api/keywords/trending`),
-        axios.get(`${API_URL}/api/keywords/evergreen`)
+        axios.get(`${getApiUrl()}/api/keywords/trending`),
+        axios.get(`${getApiUrl()}/api/keywords/evergreen`)
       ]);
 
       setTrendingKeywords(trendingRes.data.keywords || []);
@@ -80,7 +80,7 @@ export default function KeywordSelector({ onSelect, loading }: KeywordSelectorPr
     try {
       // 현재 탭에 따라 type 파라미터 설정
       const type = activeTab === 'evergreen' ? 'evergreen' : 'trend';
-      const response = await axios.post(`${API_URL}/api/keywords/refresh`, { type });
+      const response = await axios.post(`${getApiUrl()}/api/keywords/refresh`, { type });
 
       if (response.data.success && response.data.keywords) {
         if (activeTab === 'trending') {

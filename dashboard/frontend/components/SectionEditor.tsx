@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import axios from 'axios';
-import { API_URL } from '@/lib/api';
+import { getApiUrl } from '@/lib/api';
 
 interface Section {
   id: string;
@@ -86,7 +86,7 @@ export default function SectionEditor({
     setIsAiLoading(true);
 
     try {
-      const response = await axios.post(`${API_URL}/api/sections/edit`, {
+      const response = await axios.post(`${getApiUrl()}/api/sections/edit`, {
         section_id: section.id,
         section_html: sectionHtml,
         instruction: instruction,
@@ -117,7 +117,7 @@ export default function SectionEditor({
     setIsAiLoading(true);
 
     try {
-      const response = await axios.post(`${API_URL}/api/sections/screenshot`, {
+      const response = await axios.post(`${getApiUrl()}/api/sections/screenshot`, {
         url: url
       });
 

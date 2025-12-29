@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import axios from 'axios';
-import { API_URL } from '@/lib/api';
+import { getApiUrl } from '@/lib/api';
 
 interface ImageManagerProps {
   image: {
@@ -24,7 +24,7 @@ export default function ImageManager({ image, articleId, onUpdate }: ImageManage
   const handleAction = async (action: string, query?: string) => {
     setLoading(true);
     try {
-      const res = await axios.post(`${API_URL}/api/images/replace`, {
+      const res = await axios.post(`${getApiUrl()}/api/images/replace`, {
         article_id: articleId,
         section_id: image.id,
         action,
