@@ -541,17 +541,26 @@ class ContentGenerator:
         Returns:
             이미지가 삽입된 HTML
         """
-        # 혼합 이미지 시스템 사용 (Phase 3)
-        if use_mixed:
-            images = self.image_fetcher.fetch_mixed_images(
-                content, keyword, category_name, count
-            )
-        else:
-            # 폴백: 기존 AI 기반 Pexels만 사용
-            images = self.image_fetcher.fetch_contextual_images(content, keyword)
+        images = {}
+
+        try:
+            # 혼합 이미지 시스템 사용 (Phase 3)
+            if use_mixed:
+                logger.info(f"Fetching mixed images for '{keyword}' (count: {count})")
+                images = self.image_fetcher.fetch_mixed_images(
+                    content, keyword, category_name, count
+                )
+            else:
+                # 폴백: 기존 AI 기반 Pexels만 사용
+                logger.info(f"Fetching contextual images for '{keyword}'")
+                images = self.image_fetcher.fetch_contextual_images(content, keyword)
+        except Exception as e:
+            logger.error(f"Image fetching failed for '{keyword}': {e}")
+            # 이미지 가져오기 실패해도 글 발행은 계속 진행
+            images = {}
 
         if not images:
-            logger.warning(f"No images found for {keyword}")
+            logger.warning(f"No images found for {keyword}, continuing without images")
             # 이미지 태그 및 IMG_CONTEXT 주석 제거 (확장 패턴: 콜론 포함)
             content = re.sub(r'<!-- IMG_CONTEXT: .+? -->\s*', '', content)
             content = re.sub(r'\[IMAGE_\d+[^\]]*\]', '', content)  # [IMAGE_N: 설명] 포함

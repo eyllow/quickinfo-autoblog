@@ -1,6 +1,7 @@
 """워드프레스 REST API 발행기"""
 import base64
 import logging
+import re
 import time
 from typing import Optional
 from dataclasses import dataclass
@@ -25,6 +26,41 @@ CATEGORY_TAGS = {
     "취업교육": ["취업정보", "자기계발"],
     "트렌드": ["트렌드", "이슈"],
 }
+
+
+def is_auto_publish_tag(tag: str) -> bool:
+    """
+    자동발행 내부용 태그인지 확인
+
+    다음 패턴을 필터링:
+    - 날짜 형식: 20251230, 2025-12-30, 2025/12/30
+    - 자동발행 관련: 자동발행, auto, autopublish, scheduled
+    - 순수 숫자: 1234
+    """
+    tag_lower = tag.lower().strip()
+
+    # 자동발행 관련 키워드
+    auto_keywords = ['자동발행', 'auto', 'autopublish', 'scheduled', 'autopost']
+    if tag_lower in auto_keywords:
+        return True
+
+    # 순수 숫자 (날짜 등)
+    if tag.isdigit():
+        return True
+
+    # YYYYMMDD 형식 (예: 20251230)
+    if re.match(r'^\d{8}$', tag):
+        return True
+
+    # YYYY-MM-DD 또는 YYYY/MM/DD 형식
+    if re.match(r'^\d{4}[-/]\d{2}[-/]\d{2}$', tag):
+        return True
+
+    # YYYYMM 형식 (예: 202512)
+    if re.match(r'^\d{6}$', tag):
+        return True
+
+    return False
 
 
 def generate_tags(keyword: str, category: str = None) -> list[str]:
@@ -53,14 +89,12 @@ def generate_tags(keyword: str, category: str = None) -> list[str]:
     if category and category in CATEGORY_TAGS:
         tags.extend(CATEGORY_TAGS[category])
 
-    # 3. 필터링
+    # 3. 필터링 (자동발행 내부 태그 제거)
     filtered_tags = []
     for tag in tags:
-        # "자동발행" 태그 제거
-        if tag == "자동발행":
-            continue
-        # 숫자만 있는 태그 제거 (날짜 등)
-        if tag.isdigit():
+        # 자동발행 내부 태그 제거 (날짜, auto 등)
+        if is_auto_publish_tag(tag):
+            logger.debug(f"Filtered auto-publish tag: {tag}")
             continue
         # 중복 제거
         if tag not in filtered_tags:
@@ -420,8 +454,8 @@ class WordPressPublisher:
         if tags is None:
             tags = generate_tags(keyword, category)
         else:
-            # 기존 태그에서 필터링
-            tags = [t for t in tags if t != "자동발행" and not t.isdigit()]
+            # 기존 태그에서 자동발행 내부 태그 필터링
+            tags = [t for t in tags if not is_auto_publish_tag(t)]
             if keyword not in tags:
                 tags.insert(0, keyword)
             tags = tags[:5]

@@ -13,6 +13,7 @@
 import argparse
 import json
 import logging
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -160,6 +161,10 @@ def process_keyword(
         logger.info(f"  - Category: {post.category}")
         logger.info(f"  - Has Coupang: {post.has_coupang}")
         logger.info(f"  - Web Sources: {len(post.sources)}")
+
+        # 이미지 삽입 확인 로그
+        image_count = len(re.findall(r'<figure[^>]*>.*?<img[^>]*>.*?</figure>', post.content, re.DOTALL | re.IGNORECASE))
+        logger.info(f"  - Images inserted: {image_count}")
         logger.info(f"  - Excerpt: {post.excerpt[:50]}..." if post.excerpt else "  - Excerpt: (none)")
 
         # 웹검색 출처 표시
