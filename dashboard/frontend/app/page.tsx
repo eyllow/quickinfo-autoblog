@@ -6,6 +6,7 @@ import ModeToggle from '@/components/ModeToggle';
 import KeywordSelector from '@/components/KeywordSelector';
 import ArticleEditor from '@/components/ArticleEditor';
 import PublishStats from '@/components/PublishStats';
+import SchedulerPanel from '@/components/SchedulerPanel';
 import LogPanel from '@/components/LogPanel';
 import { getApiUrl } from '@/lib/api';
 
@@ -88,8 +89,11 @@ export default function Dashboard() {
 
       {/* 메인 컨텐츠 */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* 통계 */}
-        <PublishStats />
+        {/* 통계 및 스케줄러 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <PublishStats />
+          <SchedulerPanel />
+        </div>
 
         {/* 실시간 로그 패널 */}
         <LogPanel />
