@@ -194,6 +194,103 @@ async def generate_article(request: ArticleCreate):
         raise HTTPException(status_code=500, detail=f"글 생성 실패: {str(e)}")
 
 
+@router.get("/recent")
+async def get_recent_posts(limit: int = 5):
+    """최근 발행된 글 목록"""
+    try:
+        import sqlite3
+
+        db_path = PROJECT_ROOT / "data" / "blog.db"
+
+        if not db_path.exists():
+            return {"posts": []}
+
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT id, title, category, url, created_at as published_at
+            FROM posts
+            WHERE status = 'published'
+            ORDER BY created_at DESC
+            LIMIT ?
+        """, (limit,))
+
+        posts = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+
+        return {"posts": posts}
+    except Exception as e:
+        logger.error(f"Failed to get recent posts: {e}")
+        return {"posts": []}
+
+
+@router.get("/stats")
+async def get_article_stats():
+    """발행 통계"""
+    try:
+        import sqlite3
+        from datetime import timedelta
+
+        db_path = PROJECT_ROOT / "data" / "blog.db"
+
+        if not db_path.exists():
+            return {
+                "today": 0,
+                "thisWeek": 0,
+                "total": 0,
+                "pending": 0,
+                "yesterdayTotal": 0
+            }
+
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.cursor()
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        week_start = (datetime.now() - timedelta(days=datetime.now().weekday())).strftime("%Y-%m-%d")
+
+        # 오늘 발행 수
+        cursor.execute("SELECT COUNT(*) FROM posts WHERE status='published' AND date(created_at)=?", (today,))
+        today_count = cursor.fetchone()[0]
+
+        # 어제 발행 수
+        cursor.execute("SELECT COUNT(*) FROM posts WHERE status='published' AND date(created_at)=?", (yesterday,))
+        yesterday_count = cursor.fetchone()[0]
+
+        # 이번 주 발행 수
+        cursor.execute("SELECT COUNT(*) FROM posts WHERE status='published' AND date(created_at)>=?", (week_start,))
+        week_count = cursor.fetchone()[0]
+
+        # 전체 발행 수
+        cursor.execute("SELECT COUNT(*) FROM posts WHERE status='published'")
+        total_count = cursor.fetchone()[0]
+
+        # 대기 중
+        cursor.execute("SELECT COUNT(*) FROM posts WHERE status='draft' OR status='pending'")
+        pending_count = cursor.fetchone()[0]
+
+        conn.close()
+
+        return {
+            "today": today_count,
+            "thisWeek": week_count,
+            "total": total_count,
+            "pending": pending_count,
+            "yesterdayTotal": yesterday_count
+        }
+    except Exception as e:
+        logger.error(f"Failed to get stats: {e}")
+        return {
+            "today": 0,
+            "thisWeek": 0,
+            "total": 0,
+            "pending": 0,
+            "yesterdayTotal": 0
+        }
+
+
 @router.get("/{article_id}", response_model=ArticleResponse)
 async def get_article(article_id: str):
     """글 조회"""
@@ -816,98 +913,3 @@ async def natural_edit(article_id: str, request: NaturalEditRequest):
         )
 
 
-@router.get("/recent")
-async def get_recent_posts(limit: int = 5):
-    """최근 발행된 글 목록"""
-    try:
-        import sqlite3
-
-        db_path = PROJECT_ROOT / "data" / "blog.db"
-
-        if not db_path.exists():
-            return {"posts": []}
-
-        conn = sqlite3.connect(str(db_path))
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-
-        cursor.execute("""
-            SELECT id, title, category, url, created_at as published_at
-            FROM posts
-            WHERE status = 'published'
-            ORDER BY created_at DESC
-            LIMIT ?
-        """, (limit,))
-
-        posts = [dict(row) for row in cursor.fetchall()]
-        conn.close()
-
-        return {"posts": posts}
-    except Exception as e:
-        logger.error(f"Failed to get recent posts: {e}")
-        return {"posts": []}
-
-
-@router.get("/stats")
-async def get_article_stats():
-    """발행 통계"""
-    try:
-        import sqlite3
-        from datetime import timedelta
-
-        db_path = PROJECT_ROOT / "data" / "blog.db"
-
-        if not db_path.exists():
-            return {
-                "today": 0,
-                "thisWeek": 0,
-                "total": 0,
-                "pending": 0,
-                "yesterdayTotal": 0
-            }
-
-        conn = sqlite3.connect(str(db_path))
-        cursor = conn.cursor()
-
-        today = datetime.now().strftime("%Y-%m-%d")
-        yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-        week_start = (datetime.now() - timedelta(days=datetime.now().weekday())).strftime("%Y-%m-%d")
-
-        # 오늘 발행 수
-        cursor.execute("SELECT COUNT(*) FROM posts WHERE status='published' AND date(created_at)=?", (today,))
-        today_count = cursor.fetchone()[0]
-
-        # 어제 발행 수
-        cursor.execute("SELECT COUNT(*) FROM posts WHERE status='published' AND date(created_at)=?", (yesterday,))
-        yesterday_count = cursor.fetchone()[0]
-
-        # 이번 주 발행 수
-        cursor.execute("SELECT COUNT(*) FROM posts WHERE status='published' AND date(created_at)>=?", (week_start,))
-        week_count = cursor.fetchone()[0]
-
-        # 전체 발행 수
-        cursor.execute("SELECT COUNT(*) FROM posts WHERE status='published'")
-        total_count = cursor.fetchone()[0]
-
-        # 대기 중
-        cursor.execute("SELECT COUNT(*) FROM posts WHERE status='draft' OR status='pending'")
-        pending_count = cursor.fetchone()[0]
-
-        conn.close()
-
-        return {
-            "today": today_count,
-            "thisWeek": week_count,
-            "total": total_count,
-            "pending": pending_count,
-            "yesterdayTotal": yesterday_count
-        }
-    except Exception as e:
-        logger.error(f"Failed to get stats: {e}")
-        return {
-            "today": 0,
-            "thisWeek": 0,
-            "total": 0,
-            "pending": 0,
-            "yesterdayTotal": 0
-        }
