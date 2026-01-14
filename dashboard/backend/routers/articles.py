@@ -210,7 +210,7 @@ async def get_recent_posts(limit: int = 5):
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT id, title, category, url, created_at as published_at
+            SELECT id, title, category, wp_url as url, created_at as published_at
             FROM posts
             WHERE status = 'published'
             ORDER BY created_at DESC
