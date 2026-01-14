@@ -120,6 +120,8 @@ from .prompts import (
     HUMAN_PERSONA_PROMPT
 )
 from .template_prompts import generate_template_prompt, get_template_info_log
+from generators.humanizer import humanize_content
+from media.link_matcher import insert_related_links
 
 logger = logging.getLogger(__name__)
 
@@ -996,12 +998,10 @@ class ContentGenerator:
         content = self.insert_images(content, keyword, category_name, image_count)
         print(f"  └─ 이미지 삽입 완료")
 
-        # 공식 사이트 링크 삽입
-        if category_config.get("requires_official_link", False):
-            content = self.insert_official_link(content, keyword)
-            print(f"  └─ 공식 링크 삽입 완료")
-        else:
-            content = content.replace("[OFFICIAL_LINK]", "")
+        # 관련 사이트 링크 자동 삽입 (카테고리 상관없이 항상)
+        print("  🔗 관련 사이트 링크 삽입 중...")
+        content = insert_related_links(content, keyword)
+        print("  ✅ 링크 삽입 완료")
 
         # 건강 면책문구 삽입
         if category_config.get("requires_disclaimer", False):

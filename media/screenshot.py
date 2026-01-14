@@ -15,6 +15,9 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+# 사이트 링크 설정 파일 경로
+SITE_LINKS_CONFIG = Path(__file__).resolve().parent.parent / "config" / "site_links.json"
+
 # 현재 파일 디렉토리
 SCRIPT_DIR = Path(__file__).resolve().parent
 SCREENSHOT_SCRIPT = SCRIPT_DIR / "screenshot.js"
@@ -203,6 +206,26 @@ class ScreenshotCapture:
         self.script_path = SCREENSHOT_SCRIPT
         self.output_dir = Path(tempfile.gettempdir()) / "autoblog_screenshots"
         self.output_dir.mkdir(exist_ok=True)
+        # 설정 파일에서 사이트 정보 로드
+        self._load_site_config()
+
+    def _load_site_config(self):
+        """설정 파일에서 사이트 정보 로드"""
+        self.site_config = {}
+        try:
+            if SITE_LINKS_CONFIG.exists():
+                with open(SITE_LINKS_CONFIG, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    # 키워드 -> 사이트 정보 매핑 구축
+                    for site_key, site_info in config.items():
+                        for kw in site_info.get("keywords", []):
+                            self.site_config[kw] = {
+                                "url": site_info["url"],
+                                "name": site_info["name"]
+                            }
+                logger.info(f"사이트 설정 로드 완료: {len(self.site_config)}개 키워드")
+        except Exception as e:
+            logger.warning(f"사이트 설정 로드 실패: {e}")
 
     def is_available(self) -> bool:
         """
@@ -240,6 +263,13 @@ class ScreenshotCapture:
 
     def get_official_site(self, keyword: str) -> Optional[Dict]:
         """키워드에 맞는 공식 사이트 정보 반환"""
+        # 1. JSON 설정 파일에서 먼저 찾기
+        for key, info in self.site_config.items():
+            if key in keyword:
+                logger.debug(f"설정 파일에서 사이트 찾음: {key} -> {info['name']}")
+                return info
+
+        # 2. 기존 OFFICIAL_SITES에서 찾기 (폴백)
         for key, info in OFFICIAL_SITES.items():
             if key in keyword:
                 return info

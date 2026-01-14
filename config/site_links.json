@@ -1,0 +1,104 @@
+{
+  "정부24": {
+    "url": "https://www.gov.kr",
+    "name": "정부24",
+    "description": "대한민국 정부 민원 포털",
+    "keywords": ["정부24", "민원", "등본", "초본", "주민등록", "가족관계증명서"]
+  },
+  "국세청": {
+    "url": "https://www.hometax.go.kr",
+    "name": "홈택스",
+    "description": "국세청 홈택스",
+    "keywords": ["연말정산", "소득세", "세금", "홈택스", "국세청", "종합소득세", "부가세", "양도소득세", "증여세", "상속세"]
+  },
+  "고용보험": {
+    "url": "https://www.ei.go.kr",
+    "name": "고용보험",
+    "description": "고용보험 포털",
+    "keywords": ["실업급여", "고용보험", "구직급여", "육아휴직", "출산휴가"]
+  },
+  "청년도약계좌": {
+    "url": "https://www.kinfa.or.kr",
+    "name": "서민금융진흥원",
+    "description": "청년도약계좌 신청",
+    "keywords": ["청년도약계좌", "청년희망적금", "청년미래적금"]
+  },
+  "주택청약": {
+    "url": "https://www.applyhome.co.kr",
+    "name": "청약홈",
+    "description": "주택청약 신청",
+    "keywords": ["주택청약", "청약", "아파트청약", "청약홈"]
+  },
+  "건강보험": {
+    "url": "https://www.nhis.or.kr",
+    "name": "국민건강보험공단",
+    "description": "건강보험 포털",
+    "keywords": ["건강보험", "의료보험", "건강보험료", "피부양자"]
+  },
+  "국민연금": {
+    "url": "https://www.nps.or.kr",
+    "name": "국민연금공단",
+    "description": "국민연금 포털",
+    "keywords": ["국민연금", "연금", "노후", "퇴직연금"]
+  },
+  "근로복지공단": {
+    "url": "https://www.kcomwel.or.kr",
+    "name": "근로복지공단",
+    "description": "산재보험, 고용안정",
+    "keywords": ["산재", "퇴직금", "임금체불", "근로복지"]
+  },
+  "여권": {
+    "url": "https://www.passport.go.kr",
+    "name": "여권안내",
+    "description": "여권 발급 안내",
+    "keywords": ["여권", "여권발급", "여권재발급"]
+  },
+  "운전면허": {
+    "url": "https://www.safedriving.or.kr",
+    "name": "도로교통공단",
+    "description": "운전면허 시험/갱신",
+    "keywords": ["운전면허", "면허갱신", "면허시험"]
+  },
+  "워크넷": {
+    "url": "https://www.work.go.kr",
+    "name": "워크넷",
+    "description": "고용노동부 취업포털",
+    "keywords": ["청년내일채움공제", "국민취업지원제도", "일자리"]
+  },
+  "자동차보험": {
+    "url": "https://www.knia.or.kr",
+    "name": "손해보험협회",
+    "description": "자동차보험 정보",
+    "keywords": ["자동차보험", "차량보험"]
+  },
+  "생명보험": {
+    "url": "https://www.klia.or.kr",
+    "name": "생명보험협회",
+    "description": "생명보험 정보",
+    "keywords": ["실비보험", "암보험", "생명보험"]
+  },
+  "네이버금융": {
+    "url": "https://finance.naver.com/marketindex/",
+    "name": "네이버 금융",
+    "description": "환율/시세 정보",
+    "keywords": ["환율", "달러환율", "엔화환율"]
+  },
+  "네이버증권": {
+    "url": "https://finance.naver.com/sise/",
+    "name": "네이버 증권",
+    "description": "주식 시세 정보",
+    "keywords": ["코스피", "코스닥", "주식시세"]
+  },
+  "업비트": {
+    "url": "https://upbit.com/exchange?code=CRIX.UPBIT.KRW-BTC",
+    "name": "업비트",
+    "description": "암호화폐 거래소",
+    "keywords": ["비트코인", "이더리움", "암호화폐", "가상화폐"]
+  },
+  "네이버날씨": {
+    "url": "https://weather.naver.com/",
+    "name": "네이버 날씨",
+    "description": "날씨 정보",
+    "keywords": ["날씨", "오늘날씨", "주간날씨"]
+  }
+}

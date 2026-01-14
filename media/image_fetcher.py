@@ -17,68 +17,82 @@ logger = logging.getLogger(__name__)
 
 # 한국어 → 영어 Pexels 검색어 매핑 (다양성을 위해 리스트 사용)
 KEYWORD_TO_PEXELS = {
+    # === 정부/행정 관련 ===
+    "정부24": ["government office document", "official paperwork", "document signing"],
+    "등본": ["official document paperwork", "certificate document", "administrative office"],
+    "민원": ["customer service office", "document filing", "public service"],
+    "주민등록": ["id card document", "official certificate", "administrative paperwork"],
+
     # === 고용/실업 관련 ===
-    "실업급여": ["job interview", "office work", "career search", "business meeting"],
-    "고용보험": ["employment office", "business handshake", "career", "workplace"],
-    "구직": ["job search", "resume writing", "interview", "career planning"],
-    "취업": ["job interview", "office worker", "business professional", "career"],
-    "육아휴직": ["family work balance", "parent working", "home office", "childcare"],
-    "출산휴가": ["maternity", "family", "baby care", "work life balance"],
+    "실업급여": ["job search interview", "career planning", "business meeting", "office professional"],
+    "고용보험": ["employment office", "business professional", "career planning", "workplace"],
+    "구직": ["job search resume", "interview preparation", "career planning professional"],
+    "취업": ["job interview professional", "office worker success", "business professional"],
+    "육아휴직": ["family work balance", "parent working home", "home office family"],
+    "출산휴가": ["maternity family", "newborn care", "work life balance family"],
 
     # === 연금/보험 관련 ===
-    "국민연금": ["retirement planning", "senior finance", "pension savings", "elderly care"],
-    "건강보험": ["health insurance", "medical document", "healthcare", "hospital"],
-    "의료보험": ["medical insurance", "healthcare", "doctor patient", "hospital"],
-    "자동차보험": ["car insurance", "automobile safety", "driving", "car accident"],
-    "실비보험": ["health insurance", "medical bill", "hospital", "healthcare cost"],
-    "암보험": ["health protection", "medical care", "hospital", "insurance document"],
-    "보험": ["insurance document", "protection shield", "security", "financial safety"],
+    "국민연금": ["retirement planning senior", "pension savings elderly", "financial planning retirement"],
+    "건강보험": ["health insurance document", "medical healthcare", "hospital document"],
+    "의료보험": ["medical insurance healthcare", "doctor patient consultation", "hospital care"],
+    "자동차보험": ["car insurance document", "automobile safety", "vehicle protection"],
+    "실비보험": ["health insurance medical", "healthcare document", "medical bill"],
+    "암보험": ["health protection medical", "healthcare insurance", "medical document"],
+    "보험": ["insurance document protection", "financial security", "document signing"],
 
     # === 세금/금융 관련 ===
-    "연말정산": ["tax document", "calculator finance", "accounting office", "tax return"],
-    "종합소득세": ["tax filing", "financial document", "accounting", "tax calculator"],
-    "부가세": ["business tax", "invoice", "accounting", "financial report"],
-    "양도소득세": ["real estate document", "property tax", "home sale", "tax form"],
-    "증여세": ["gift money", "inheritance", "family finance", "tax planning"],
-    "상속세": ["inheritance document", "family wealth", "estate planning", "legal document"],
-    "세금": ["tax documents", "calculator", "accounting", "financial planning"],
+    "연말정산": ["tax document calculator", "accounting office financial", "tax return form"],
+    "종합소득세": ["tax filing document", "financial accounting", "tax calculator professional"],
+    "부가세": ["business tax invoice", "accounting financial", "business document"],
+    "양도소득세": ["real estate document", "property sale", "home transaction"],
+    "증여세": ["family finance planning", "inheritance document", "legal financial"],
+    "상속세": ["inheritance document legal", "estate planning", "family wealth"],
+    "세금": ["tax documents calculator", "accounting professional", "financial planning"],
 
     # === 청년/금융상품 ===
-    "청년도약계좌": ["savings money", "piggy bank", "young professional", "financial planning"],
-    "청년": ["young professional", "student success", "career start", "office worker"],
-    "적금": ["savings account", "money jar", "piggy bank", "financial growth"],
-    "주택청약": ["house keys", "new home", "real estate", "apartment"],
+    "청년도약계좌": ["young professional saving", "piggy bank savings", "financial planning youth"],
+    "청년": ["young professional success", "career start office", "business professional young"],
+    "적금": ["savings account money", "piggy bank financial", "money growth savings"],
+    "주택청약": ["house keys new home", "real estate apartment", "home purchase"],
 
     # === 투자/금융정보 ===
-    "주식": ["stock market chart", "trading", "investment", "finance graph"],
-    "투자": ["investment growth", "financial chart", "money growth", "portfolio"],
-    "부동산": ["real estate", "house property", "apartment building", "home sale"],
-    "비트코인": ["bitcoin cryptocurrency", "digital money", "blockchain", "crypto trading"],
-    "코스피": ["stock exchange", "trading floor", "financial market", "investment"],
-    "환율": ["currency exchange", "money bills", "forex trading", "international finance"],
+    "주식": ["stock market chart graph", "trading investment", "finance analysis"],
+    "투자": ["investment growth chart", "financial portfolio", "money growth"],
+    "부동산": ["real estate property", "apartment building", "home sale house"],
+    "비트코인": ["cryptocurrency digital", "blockchain technology", "digital finance"],
+    "코스피": ["stock exchange trading", "financial market graph", "investment chart"],
+    "환율": ["currency exchange money", "forex trading", "international finance"],
 
     # === 라이프스타일 ===
-    "다이어트": ["healthy diet food", "fitness nutrition", "weight loss", "healthy eating"],
-    "운동": ["fitness exercise", "gym workout", "sports", "healthy lifestyle"],
-    "건강": ["healthy lifestyle", "wellness", "fitness", "medical checkup"],
-    "자동차": ["car automobile", "driving", "vehicle", "road trip"],
-    "여행": ["travel vacation", "tourism", "airplane", "adventure"],
-    "맛집": ["restaurant food", "dining", "gourmet", "food photography"],
+    "다이어트": ["healthy food nutrition", "fitness meal", "healthy eating lifestyle"],
+    "운동": ["fitness exercise gym", "workout sports", "healthy lifestyle active"],
+    "건강": ["healthy lifestyle wellness", "fitness active", "medical checkup"],
+    "자동차": ["car automobile modern", "driving road", "vehicle transportation"],
+    "여행": ["travel vacation destination", "tourism adventure", "airplane journey"],
+    "맛집": ["restaurant food gourmet", "dining delicious", "food photography"],
 
     # === 테크 ===
-    "아이폰": ["iphone smartphone", "mobile phone", "technology", "app usage"],
-    "갤럭시": ["samsung smartphone", "android phone", "mobile technology", "device"],
-    "노트북": ["laptop computer", "work from home", "technology", "office desk"],
+    "아이폰": ["smartphone mobile technology", "mobile phone app", "technology device"],
+    "갤럭시": ["smartphone android mobile", "mobile technology", "phone device"],
+    "노트북": ["laptop computer work", "technology workspace", "office desk computer"],
 
     # === 기타 ===
-    "인테리어": ["home interior", "room design", "furniture", "modern living"],
-    "요리": ["cooking food", "kitchen", "chef", "home cooking"],
-    "뷰티": ["beauty skincare", "cosmetics", "makeup", "self care"],
-    "패션": ["fashion style", "clothing", "outfit", "trendy"],
+    "인테리어": ["home interior design", "room furniture modern", "living space"],
+    "요리": ["cooking food kitchen", "chef preparing", "home cooking"],
+    "뷰티": ["beauty skincare cosmetics", "makeup self care", "beauty routine"],
+    "패션": ["fashion style outfit", "clothing trendy", "style modern"],
+    "날씨": ["weather sky clouds", "sunshine outdoor", "nature weather"],
 }
 
 # 기본 검색어 (매핑 없을 때 사용)
-DEFAULT_PEXELS_QUERIES = ["business office", "professional work", "modern lifestyle", "technology"]
+DEFAULT_PEXELS_QUERIES = ["business office professional", "modern workspace", "technology office", "professional document"]
+
+# 제외할 이미지 키워드 (부적절한 이미지 방지)
+EXCLUDE_TERMS = [
+    "police", "arrest", "crime", "sad", "crying", "angry",
+    "funeral", "hospital bed", "accident", "violence", "gun",
+    "stress", "headache", "frustrated", "worried", "anxious"
+]
 
 
 class ImageFetcher:
@@ -176,13 +190,19 @@ class ImageFetcher:
             # 랜덤하게 섞기
             random.shuffle(photos)
 
-            # 중복 제거하면서 이미지 수집
+            # 중복 제거 및 부적절한 이미지 필터링하면서 수집
             images = []
             for photo in photos:
                 photo_id = photo["id"]
 
                 # 이미 사용된 이미지 건너뛰기
                 if photo_id in self._used_image_ids:
+                    continue
+
+                # 부적절한 이미지 필터링
+                alt_text = photo.get("alt", "").lower()
+                if any(term in alt_text for term in EXCLUDE_TERMS):
+                    logger.debug(f"부적절한 이미지 제외: {alt_text[:50]}")
                     continue
 
                 # 사용 기록에 추가
@@ -200,7 +220,7 @@ class ImageFetcher:
                 if len(images) >= count:
                     break
 
-            logger.info(f"이미지 {len(images)}개 수집 완료 (중복 제외)")
+            logger.info(f"이미지 {len(images)}개 수집 완료 (중복/부적절 제외)")
             return images
 
         except requests.RequestException as e:
