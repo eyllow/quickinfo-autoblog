@@ -396,9 +396,9 @@ class WordPressPublisher:
 
         return PublishResult(success=False, error="Unknown error")
 
-    def fetch_unsplash_image(self, keyword: str) -> Optional[str]:
+    def fetch_pexels_image(self, keyword: str) -> Optional[str]:
         """
-        Unsplash에서 키워드 관련 이미지 URL 가져오기
+        Pexels에서 키워드 관련 이미지 URL 가져오기
 
         Args:
             keyword: 검색 키워드
@@ -406,10 +406,54 @@ class WordPressPublisher:
         Returns:
             이미지 URL 또는 None
         """
-        # Unsplash Source API (인증 불필요)
-        # 참고: 프로덕션에서는 Unsplash API 키 사용 권장
-        image_url = f"https://source.unsplash.com/1200x630/?{keyword}"
-        return image_url
+        api_key = settings.pexels_api_key
+        if not api_key:
+            logger.warning("PEXELS_API_KEY not found")
+            return None
+
+        try:
+            # 한글 키워드를 영어로 매핑
+            keyword_mapping = {
+                "연말정산": "tax document calculator",
+                "실업급여": "job search interview",
+                "청년도약계좌": "savings money piggy bank",
+                "국민연금": "retirement pension planning",
+                "건강보험": "health insurance medical",
+                "주택청약": "apartment housing keys",
+                "전월세": "rental apartment interior",
+                "정부24": "government office document",
+                "비트코인": "cryptocurrency digital",
+                "주식": "stock market chart",
+                "환율": "currency exchange money",
+            }
+
+            # 키워드 매핑 찾기
+            search_query = "business office professional"
+            for kr_key, en_query in keyword_mapping.items():
+                if kr_key in keyword:
+                    search_query = en_query
+                    break
+
+            headers = {"Authorization": api_key}
+            response = requests.get(
+                "https://api.pexels.com/v1/search",
+                headers=headers,
+                params={"query": search_query, "per_page": 1, "orientation": "landscape"},
+                timeout=10.0
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("photos"):
+                    image_url = data["photos"][0]["src"]["large"]
+                    logger.info(f"Pexels 이미지 찾음: {keyword} -> {search_query}")
+                    return image_url
+
+            logger.warning(f"Pexels 검색 실패: {response.status_code}")
+            return None
+        except Exception as e:
+            logger.error(f"Pexels image fetch failed: {e}")
+            return None
 
     def publish_with_image(
         self,
@@ -441,7 +485,7 @@ class WordPressPublisher:
         # 대표 이미지 업로드 시도
         featured_media_id = None
         try:
-            image_url = self.fetch_unsplash_image(keyword)
+            image_url = self.fetch_pexels_image(keyword)
             if image_url:
                 featured_media_id = self.upload_image(
                     image_url=image_url,
