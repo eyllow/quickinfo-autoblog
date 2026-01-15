@@ -200,7 +200,7 @@ async def get_recent_posts(limit: int = 5):
     try:
         import sqlite3
 
-        db_path = PROJECT_ROOT / "data" / "posts.db"
+        db_path = PROJECT_ROOT / "database" / "blog_publisher.db"
 
         if not db_path.exists():
             return {"posts": []}
@@ -232,7 +232,7 @@ async def get_article_stats():
         import sqlite3
         from datetime import timedelta
 
-        db_path = PROJECT_ROOT / "data" / "posts.db"
+        db_path = PROJECT_ROOT / "database" / "blog_publisher.db"
 
         if not db_path.exists():
             return {

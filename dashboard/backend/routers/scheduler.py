@@ -40,7 +40,7 @@ async def get_scheduler_status():
     today_str = datetime.now().strftime("%Y-%m-%d")
 
     try:
-        db_path = PROJECT_ROOT / "data" / "posts.db"
+        db_path = PROJECT_ROOT / "database" / "blog_publisher.db"
         if db_path.exists():
             conn = sqlite3.connect(str(db_path))
             conn.row_factory = sqlite3.Row
