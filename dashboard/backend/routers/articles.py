@@ -210,9 +210,8 @@ async def get_recent_posts(limit: int = 5):
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT id, title, category, wp_url as url, created_at as published_at
-            FROM posts
-            WHERE status = 'published'
+            SELECT id, title, keyword as category, wp_url as url, created_at as published_at
+            FROM published_posts
             ORDER BY created_at DESC
             LIMIT ?
         """, (limit,))
@@ -252,24 +251,23 @@ async def get_article_stats():
         week_start = (datetime.now() - timedelta(days=datetime.now().weekday())).strftime("%Y-%m-%d")
 
         # 오늘 발행 수
-        cursor.execute("SELECT COUNT(*) FROM posts WHERE status='published' AND date(created_at)=?", (today,))
+        cursor.execute("SELECT COUNT(*) FROM published_posts WHERE date(created_at)=?", (today,))
         today_count = cursor.fetchone()[0]
 
         # 어제 발행 수
-        cursor.execute("SELECT COUNT(*) FROM posts WHERE status='published' AND date(created_at)=?", (yesterday,))
+        cursor.execute("SELECT COUNT(*) FROM published_posts WHERE date(created_at)=?", (yesterday,))
         yesterday_count = cursor.fetchone()[0]
 
         # 이번 주 발행 수
-        cursor.execute("SELECT COUNT(*) FROM posts WHERE status='published' AND date(created_at)>=?", (week_start,))
+        cursor.execute("SELECT COUNT(*) FROM published_posts WHERE date(created_at)>=?", (week_start,))
         week_count = cursor.fetchone()[0]
 
         # 전체 발행 수
-        cursor.execute("SELECT COUNT(*) FROM posts WHERE status='published'")
+        cursor.execute("SELECT COUNT(*) FROM published_posts")
         total_count = cursor.fetchone()[0]
 
-        # 대기 중
-        cursor.execute("SELECT COUNT(*) FROM posts WHERE status='draft' OR status='pending'")
-        pending_count = cursor.fetchone()[0]
+        # 대기 중 (published_posts 테이블에는 대기 상태가 없음)
+        pending_count = 0
 
         conn.close()
 

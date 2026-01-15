@@ -47,9 +47,9 @@ async def get_scheduler_status():
             cursor = conn.cursor()
 
             cursor.execute("""
-                SELECT title, category, wp_url as url, created_at
-                FROM posts
-                WHERE date(created_at) = ? AND status = 'published'
+                SELECT title, keyword as category, wp_url as url, created_at
+                FROM published_posts
+                WHERE date(created_at) = ?
                 ORDER BY created_at DESC
             """, (today_str,))
 
