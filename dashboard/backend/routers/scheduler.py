@@ -17,6 +17,10 @@ SCHEDULER_SCRIPT = "scheduler.py"
 @router.get("/status")
 async def get_scheduler_status():
     """스케줄러 상태 조회"""
+    import sqlite3
+    import logging
+
+    logger = logging.getLogger(__name__)
 
     # 프로세스 실행 여부 확인
     try:
@@ -31,41 +35,36 @@ async def get_scheduler_status():
         is_running = False
         pid = None
 
-    # 오늘 발행 현황 파싱
+    # DB에서 오늘 발행 현황 조회
     today_posts = []
     today_str = datetime.now().strftime("%Y-%m-%d")
 
-    if LOG_FILE.exists():
-        try:
-            with open(LOG_FILE, 'r', encoding='utf-8', errors='ignore') as f:
-                lines = f.readlines()[-500:]  # 최근 500줄
-                for line in lines:
-                    if today_str in line:
-                        # 발행 성공 로그 파싱
-                        if "Successfully published" in line or "발행 완료" in line:
-                            try:
-                                # 시간 추출
-                                time_match = re.search(r'(\d{2}:\d{2})', line)
-                                time_str = time_match.group(1) if time_match else ""
+    try:
+        db_path = PROJECT_ROOT / "data" / "posts.db"
+        if db_path.exists():
+            conn = sqlite3.connect(str(db_path))
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
 
-                                # URL 추출
-                                url_match = re.search(r'(https?://[^\s]+)', line)
-                                url = url_match.group(1) if url_match else ""
+            cursor.execute("""
+                SELECT title, category, wp_url as url, created_at
+                FROM posts
+                WHERE date(created_at) = ? AND status = 'published'
+                ORDER BY created_at DESC
+            """, (today_str,))
 
-                                # 키워드/제목 추출
-                                keyword_match = re.search(r'키워드[:\s]+([^\s,]+)', line)
-                                keyword = keyword_match.group(1) if keyword_match else ""
-
-                                today_posts.append({
-                                    "time": time_str,
-                                    "url": url.rstrip(')').rstrip(','),
-                                    "keyword": keyword,
-                                    "status": "completed"
-                                })
-                            except Exception:
-                                pass
-        except Exception:
-            pass
+            for row in cursor.fetchall():
+                time_str = row['created_at'].split(' ')[1][:5] if row['created_at'] and ' ' in row['created_at'] else ''
+                today_posts.append({
+                    "time": time_str,
+                    "title": row['title'],
+                    "category": row['category'],
+                    "url": row['url'],
+                    "status": "completed"
+                })
+            conn.close()
+    except Exception as e:
+        logger.error(f"DB 조회 실패: {e}")
 
     # 스케줄 정보
     schedule = [
@@ -74,20 +73,25 @@ async def get_scheduler_status():
         {"time": "18:00~18:30", "type": "에버그린", "status": "pending"},
     ]
 
-    # 현재 시간 기준으로 상태 업데이트
+    # 현재 시간 기준으로 상태 계산
     current_hour = datetime.now().hour
-    current_minute = datetime.now().minute
     completed_count = len(today_posts)
 
+    # 발행 완료 시간대 매칭
+    for post in today_posts:
+        hour = int(post["time"].split(":")[0]) if post["time"] else 0
+        if 7 <= hour < 12:
+            schedule[0]["status"] = "completed"
+        elif 12 <= hour < 18:
+            schedule[1]["status"] = "completed"
+        elif hour >= 18:
+            schedule[2]["status"] = "completed"
+
+    # 지난 시간대 중 미완료는 missed로 표시
     for i, s in enumerate(schedule):
-        hour = int(s["time"].split(":")[0])
-        if current_hour > hour or (current_hour == hour and current_minute > 30):
-            if i < completed_count:
-                schedule[i]["status"] = "completed"
-            else:
-                schedule[i]["status"] = "missed"
-        elif current_hour == hour and current_minute <= 30:
-            schedule[i]["status"] = "running"
+        slot_hour = int(s["time"].split(":")[0])
+        if current_hour > slot_hour + 1 and s["status"] == "pending":
+            s["status"] = "missed"
 
     # 다음 발행 시간 계산
     next_publish = None
@@ -101,7 +105,7 @@ async def get_scheduler_status():
         "pid": pid,
         "today_completed": completed_count,
         "today_total": 3,
-        "today_posts": today_posts[-5:],  # 최근 5개만
+        "today_posts": today_posts[:5],
         "schedule": schedule,
         "next_publish": next_publish,
         "last_updated": datetime.now().isoformat()
