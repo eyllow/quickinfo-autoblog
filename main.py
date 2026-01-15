@@ -264,7 +264,7 @@ def run_pipeline(
     else:
         # 트렌드 키워드 가져오기
         logger.info("Fetching trending keywords from Google Trends...")
-        all_keywords = trends_crawler.get_trending_keywords(limit=20)
+        all_keywords = trends_crawler.get_trending_keywords_simple(limit=20)
         logger.info(f"Fetched {len(all_keywords)} keywords")
 
         if not all_keywords:
