@@ -45,23 +45,27 @@ def get_screenshot_recommendation(keyword: str, category: str) -> dict:
 - 특정 웹사이트 사용법 설명
 
 [인물/연예인 키워드의 경우 - 중요!]
-- 연예인, 배우, 가수 등 인물 키워드인 경우:
-  - 나무위키 프로필 페이지 스크린샷 권장
-  - URL 형식: https://namu.wiki/w/인물이름 (예: https://namu.wiki/w/김수현)
-  - 또는 관련 드라마/영화 공식 페이지, OTT 페이지
-  - ❌ 절대 인스타그램, 페이스북 등 SNS는 추천하지 마세요 (저작권/봇차단)
-  - ❌ 연예인 얼굴 사진이 메인인 페이지는 피하세요 (초상권)
+- 연예인, 배우, 가수, 정치인, 스포츠 선수 등 인물 키워드인 경우:
+  - ✅ 네이버 인물 검색 페이지 추천: https://search.naver.com/search.naver?where=nexearch&query=인물이름
+  - ✅ 네이버 뉴스 검색 페이지 추천: https://search.naver.com/search.naver?where=news&query=인물이름
+  - ❌ 나무위키 절대 금지 (Cloudflare 차단으로 캡처 불가)
+  - ❌ 인스타그램, 페이스북 등 SNS 금지 (저작권/봇차단)
+  - ❌ 연예인 얼굴 사진이 메인인 페이지 피하기 (초상권)
 
 [스크린샷이 불필요한 경우]
 - 일반적인 정보/팁 (다이어트, 건강, 여행)
 - 개념 설명 (투자 방법론, 자기계발)
 - 리뷰/비교 콘텐츠
 
+[절대 추천 금지 도메인]
+- namu.wiki (나무위키) - Cloudflare 인증으로 캡처 불가
+- namuwiki.kr
+- instagram.com, facebook.com, twitter.com, x.com
+
 [URL 추천 시 규칙]
 - 반드시 실제 존재하는 공식 사이트 URL
 - 로그인 없이 접근 가능한 페이지
 - 한국 사이트 우선
-- 인물의 경우 나무위키: https://namu.wiki/w/인물이름
 - 추천 URL 예시:
   * 환율: https://finance.naver.com/marketindex/
   * 비트코인: https://upbit.com/exchange?code=CRIX.UPBIT.KRW-BTC
@@ -69,7 +73,7 @@ def get_screenshot_recommendation(keyword: str, category: str) -> dict:
   * 연말정산/세금: https://www.hometax.go.kr/
   * 날씨: https://weather.naver.com/
   * 부동산: https://land.naver.com/
-  * 연예인/인물: https://namu.wiki/w/인물이름
+  * 인물/연예인: https://search.naver.com/search.naver?where=nexearch&query=인물이름
 
 JSON 형식으로만 응답하세요:
 {{
@@ -143,6 +147,9 @@ def validate_screenshot_url(url: str) -> bool:
         "x.com",
         "tiktok.com",
         "youtube.com",
+        "namu.wiki",        # Cloudflare 인증으로 캡처 불가
+        "namuwiki.kr",
+        "namu.moe",
         "login",
         "signin",
         "auth",

@@ -17,6 +17,77 @@ from generators.prompts import CONTENT_CONSISTENCY_RULES
 # 분량 가이드 (5000~6000자 목표)
 # =============================================================================
 
+# =============================================================================
+# 인물 키워드 전용 프롬프트 (뉴스 팩트 중심)
+# =============================================================================
+
+PERSON_NEWS_PROMPT = """
+당신은 뉴스 팩트 정리 전문가입니다. 인물 키워드에 대해 객관적이고 팩트 기반의 글을 작성합니다.
+
+## 키워드: {keyword}
+## 카테고리: {category}
+
+## 최신 정보:
+{web_data}
+
+## 작성 규칙:
+
+### 1. 제목 형식
+- "[인물명], [핵심 뉴스 내용]" 형식
+- 예: "이학재, 인천공항공사 신임 사장 선임"
+- 예: "손흥민, 토트넘 100호 골 달성"
+- 낚시성 제목 금지
+
+### 2. 서론 (300~400자)
+- 왜 지금 이 인물이 화제인지 1-2문장으로 설명
+- 핵심 뉴스 요약
+- [IMAGE_1]
+
+### 3. 본문 구성 (2500~3500자)
+
+#### 섹션 1: 핵심 뉴스 요약
+- 무슨 일이 있었는지 팩트 중심 설명
+- 뉴스에서 확인된 사실만 작성
+- "~라고 알려졌다", "~로 전해졌다" 등 출처 명시 표현 사용
+
+#### 섹션 2: 인물 기본 정보
+- 직책, 소속 등 확인된 사실만
+- 주요 경력 (뉴스에서 언급된 내용만)
+- [IMAGE_2]
+
+#### 섹션 3: 관련 배경
+- 뉴스에서 언급된 맥락만 작성
+- 업계/분야 상황 설명
+
+### 4. 마무리 (200~300자)
+- 향후 전망 (추측 금지, 뉴스 언급 내용만)
+- 독자 관심 유도
+
+## 절대 금지 사항:
+1. "성공하는 N가지 비법" 류의 제목 금지
+2. 확인되지 않은 정보 작성 금지
+3. 과장/미화/비하 표현 금지
+4. 개인 의견이나 추측 금지
+5. "~일 것으로 예상된다" (근거 없는 추측) 금지
+6. 나무위키, 위키피디아 등 검증 안 된 출처 인용 금지
+
+## HTML 스타일:
+- 전체: <div style="max-width: 700px; margin: 0 auto; font-size: 16px; line-height: 1.9; color: #333;">
+- 대제목: <h2 style="font-size: 24px; font-weight: 700; color: #222;">
+- 소제목: <h3 style="font-size: 20px; font-weight: 600; color: #333; margin-top: 30px;">
+- 본문: <p style="font-size: 16px; line-height: 2.0; color: #444;">
+
+## 이미지 태그:
+- [IMAGE_1], [IMAGE_2] 형식으로만 작성 (2개)
+- 콜론(:)이나 설명 추가 금지
+
+## 필수 태그:
+- [META]SEO 메타 설명 150자 이내[/META]: 글 맨 끝
+
+결과는 순수 HTML만 출력하세요 (```html 코드 블록 없이).
+"""
+
+
 CONTENT_LENGTH_GUIDE = """
 [분량 가이드 - 매우 중요!]
 
@@ -44,11 +115,48 @@ CONTENT_LENGTH_GUIDE = """
 """
 
 
+def generate_person_prompt(
+    keyword: str,
+    category: str,
+    web_data: str = ""
+) -> tuple:
+    """
+    인물 키워드 전용 프롬프트 생성 (뉴스 팩트 중심)
+
+    Args:
+        keyword: 인물 키워드
+        category: 카테고리명
+        web_data: 웹검색 데이터 (뉴스 정보)
+
+    Returns:
+        (프롬프트, 템플릿 키, 템플릿 설정, CTA 설정) 튜플
+    """
+    prompt = PERSON_NEWS_PROMPT.format(
+        keyword=keyword,
+        category=category,
+        web_data=web_data[:4000] if web_data else "최신 뉴스 정보를 바탕으로 작성해주세요."
+    )
+
+    # 인물 전용 템플릿 정보
+    template_info = {
+        "name": "인물 뉴스 팩트",
+        "description": "뉴스 팩트 기반 인물 소개",
+        "selected_word_count": 3500,
+        "selected_image_count": 2,
+        "sections": []
+    }
+
+    cta_config = {"position": "bottom"}
+
+    return prompt, "person_news", template_info, cta_config
+
+
 def generate_template_prompt(
     keyword: str,
     category: str,
     web_data: str = "",
-    is_evergreen: bool = False
+    is_evergreen: bool = False,
+    is_person: bool = False
 ) -> tuple:
     """
     템플릿 기반 프롬프트 생성
@@ -58,10 +166,15 @@ def generate_template_prompt(
         category: 카테고리명
         web_data: 웹검색 데이터
         is_evergreen: 에버그린 콘텐츠 여부
+        is_person: 인물 키워드 여부
 
     Returns:
         (프롬프트, 템플릿 키, 템플릿 설정, CTA 설정) 튜플
     """
+    # 인물 키워드는 전용 프롬프트 사용
+    if is_person:
+        return generate_person_prompt(keyword, category, web_data)
+
     # 1. 랜덤 템플릿 선택
     template_key, template = get_random_template()
 

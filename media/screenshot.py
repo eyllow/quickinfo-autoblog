@@ -46,6 +46,34 @@ CHROME_ARGS = [
     '--disable-background-networking',
 ]
 
+# 스크린샷 차단 도메인 (Cloudflare 인증 등 문제 있는 사이트)
+BLOCKED_SCREENSHOT_DOMAINS = [
+    'namu.wiki',
+    'namuwiki.kr',
+    'namu.moe',
+]
+
+
+def should_skip_screenshot_url(url: str) -> bool:
+    """
+    스크린샷을 건너뛸 URL인지 확인
+
+    Args:
+        url: 확인할 URL
+
+    Returns:
+        차단해야 하면 True
+    """
+    if not url:
+        return False
+
+    url_lower = url.lower()
+    for domain in BLOCKED_SCREENSHOT_DOMAINS:
+        if domain in url_lower:
+            logger.warning(f"스크린샷 차단 도메인: {domain} (URL: {url})")
+            return True
+    return False
+
 # 인물/연예인 키워드 패턴
 PERSON_KEYWORDS = [
     # 연예인
@@ -294,6 +322,11 @@ class ScreenshotCapture:
         """
         if not self.is_available():
             logger.warning("스크린샷 기능을 사용할 수 없습니다. Node.js/Puppeteer를 설치하세요.")
+            return None
+
+        # 차단 도메인 확인
+        if url and should_skip_screenshot_url(url):
+            logger.warning(f"차단된 도메인 스킵: {url}")
             return None
 
         # 인물 키워드 여부 자동 판단

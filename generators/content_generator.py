@@ -140,6 +140,58 @@ COUPANG_EXCLUDE_KEYWORDS = [
 COUPANG_EXCLUDE_CATEGORIES = ["연예", "트렌드", "재테크", "취업교육"]
 
 
+def is_person_keyword(keyword: str) -> bool:
+    """
+    인물 키워드인지 판단
+
+    Args:
+        keyword: 검사할 키워드
+
+    Returns:
+        인물 키워드 여부
+    """
+    # 1. 한글 이름 패턴 (2-4글자, 성+이름)
+    korean_name_pattern = r'^[가-힣]{2,4}$'
+    if re.match(korean_name_pattern, keyword):
+        # 일반 명사 제외 (키워드가 일반 단어일 가능성)
+        common_words = [
+            "연말정산", "비트코인", "이더리움", "주식", "부동산", "아파트",
+            "날씨", "환율", "금리", "대출", "보험", "연금", "청약",
+            "다이어트", "건강", "운동", "여행", "맛집", "카페",
+            "자동차", "스마트폰", "노트북", "게임", "영화", "드라마"
+        ]
+        if keyword in common_words:
+            return False
+        return True
+
+    # 2. 인물 관련 직함/직업 포함 여부
+    person_indicators = [
+        "선수", "배우", "가수", "사장", "대표", "의원", "장관", "감독",
+        "교수", "작가", "감독", "아나운서", "MC", "코치", "회장",
+        "총장", "원장", "소장", "부장", "차장", "과장"
+    ]
+    for indicator in person_indicators:
+        if indicator in keyword:
+            return True
+
+    # 3. 유명인 이름 패턴 (영문 포함)
+    celebrity_patterns = [
+        # 연예인
+        "손흥민", "BTS", "블랙핑크", "뉴진스", "아이브", "에스파",
+        "박보검", "송혜교", "김수현", "이민호", "전지현", "수지",
+        "아이유", "임영웅", "박서준", "정해인", "차은우",
+        # 스포츠
+        "이강인", "김민재", "황희찬", "오타니",
+        # 정치인
+        "윤석열", "이재명", "한동훈",
+    ]
+    for celeb in celebrity_patterns:
+        if celeb in keyword or keyword in celeb:
+            return True
+
+    return False
+
+
 @dataclass
 class Section:
     """섹션 데이터"""
@@ -426,12 +478,18 @@ class ContentGenerator:
         elif news_data:
             web_data_content += news_data
 
+        # 인물 키워드 여부 확인
+        is_person = is_person_keyword(keyword)
+        if is_person:
+            logger.info(f"Person keyword detected: {keyword}")
+
         # 🆕 템플릿 다양화 시스템 사용 (저품질 방지)
         prompt, template_key, template, cta_config = generate_template_prompt(
             keyword=keyword,
             category=category_name,
             web_data=web_data_content,
-            is_evergreen=is_evergreen
+            is_evergreen=is_evergreen,
+            is_person=is_person
         )
 
         # 템플릿 정보 로깅

@@ -82,6 +82,43 @@ KEYWORD_TO_PEXELS = {
     "뷰티": ["beauty skincare cosmetics", "makeup self care", "beauty routine"],
     "패션": ["fashion style outfit", "clothing trendy", "style modern"],
     "날씨": ["weather sky clouds", "sunshine outdoor", "nature weather"],
+
+    # === 인물/연예 관련 (직접 인물 대신 맥락 이미지) ===
+    "배우": ["film camera clapperboard", "movie scene filming", "spotlight stage", "drama filming set"],
+    "가수": ["concert stage performance", "microphone music", "music recording studio", "concert crowd"],
+    "아이돌": ["concert stage lights", "kpop performance stage", "music performance", "fan concert"],
+    "연예인": ["camera spotlight", "interview microphone", "entertainment media", "press conference"],
+    "선수": ["stadium sports arena", "sports competition", "athletic performance", "sports award trophy"],
+    "축구선수": ["soccer stadium football", "football field goal", "soccer match", "sports competition"],
+    "야구선수": ["baseball stadium game", "baseball diamond", "sports competition", "stadium crowd"],
+    "감독": ["film directing scene", "movie camera crew", "director chair", "filmmaking"],
+    "정치인": ["government building capitol", "political conference", "press conference microphone", "parliament building"],
+    "의원": ["parliament government building", "political meeting", "government official", "conference room"],
+    "장관": ["government meeting official", "conference room politics", "official document signing"],
+    "대표": ["business executive meeting", "corporate boardroom", "ceo office", "business professional"],
+    "사장": ["executive office business", "ceo corporate", "business meeting room", "corporate leadership"],
+    "회장": ["corporate boardroom executive", "business leadership", "ceo office modern", "business professional"],
+    "교수": ["university lecture classroom", "academic professor", "education university", "research laboratory"],
+
+    # === 조직/회사 관련 ===
+    "공항": ["airport terminal departure", "airplane aviation", "airport gate", "travel airport"],
+    "인천공항": ["airport terminal korea", "international airport", "airplane gate departure"],
+    "회사": ["corporate office building", "business meeting", "modern office workspace"],
+}
+
+# 인물 키워드 맥락 추출용 매핑 (뉴스 맥락에서 관련 이미지 검색)
+PERSON_CONTEXT_IMAGES = {
+    "드라마": ["drama filming set", "tv production scene", "film camera"],
+    "영화": ["movie cinema film", "film premiere", "movie theater"],
+    "뮤지컬": ["musical theater stage", "broadway performance", "theater spotlight"],
+    "콘서트": ["concert stage lights", "music performance live", "concert crowd"],
+    "앨범": ["music album record", "recording studio", "music production"],
+    "경기": ["sports stadium game", "sports competition", "athletic performance"],
+    "대회": ["competition award trophy", "sports event", "championship"],
+    "인터뷰": ["interview microphone media", "press conference", "media event"],
+    "선임": ["business meeting corporate", "executive announcement", "corporate event"],
+    "사장": ["ceo executive office", "corporate leadership", "business professional"],
+    "취임": ["inauguration ceremony", "official ceremony", "leadership announcement"],
 }
 
 # 기본 검색어 (매핑 없을 때 사용)
@@ -93,6 +130,48 @@ EXCLUDE_TERMS = [
     "funeral", "hospital bed", "accident", "violence", "gun",
     "stress", "headache", "frustrated", "worried", "anxious"
 ]
+
+
+def get_person_image_query(keyword: str, news_context: str = "") -> str:
+    """
+    인물 키워드용 Pexels 검색어 생성 (뉴스 맥락 기반)
+
+    인물 자체 이미지가 아닌 맥락 관련 이미지를 검색
+
+    Args:
+        keyword: 인물 키워드
+        news_context: 뉴스/웹검색 맥락
+
+    Returns:
+        Pexels 검색어
+    """
+    # 1. 뉴스 맥락에서 키워드 추출하여 관련 이미지 찾기
+    context_lower = (news_context + " " + keyword).lower()
+
+    for context_keyword, queries in PERSON_CONTEXT_IMAGES.items():
+        if context_keyword in context_lower:
+            query = random.choice(queries)
+            logger.info(f"인물 맥락 이미지: '{keyword}' + '{context_keyword}' → '{query}'")
+            return query
+
+    # 2. 직함/직업 키워드 매칭
+    for kr_keyword, en_queries in KEYWORD_TO_PEXELS.items():
+        if kr_keyword in context_lower:
+            query = random.choice(en_queries)
+            logger.info(f"인물 직업 이미지: '{keyword}' + '{kr_keyword}' → '{query}'")
+            return query
+
+    # 3. 기본 폴백 - 일반적인 미디어/뉴스 이미지
+    default_person_queries = [
+        "press conference media",
+        "news media interview",
+        "spotlight stage",
+        "professional portrait silhouette",
+        "business professional meeting"
+    ]
+    query = random.choice(default_person_queries)
+    logger.info(f"인물 기본 이미지: '{keyword}' → '{query}'")
+    return query
 
 
 class ImageFetcher:
