@@ -368,8 +368,9 @@ class WordPressPublisher:
                 post_data["categories"] = category_ids
             if tag_ids:
                 post_data["tags"] = tag_ids
-            if featured_media_id:
-                post_data["featured_media"] = featured_media_id
+            # Featured Image 제거 - 본문 이미지와 중복 방지
+            # if featured_media_id:
+            #     post_data["featured_media"] = featured_media_id
             if excerpt:
                 post_data["excerpt"] = excerpt
 
@@ -482,17 +483,17 @@ class WordPressPublisher:
         Returns:
             PublishResult 객체
         """
-        # 대표 이미지 업로드 시도
-        featured_media_id = None
-        try:
-            image_url = self.fetch_pexels_image(keyword)
-            if image_url:
-                featured_media_id = self.upload_image(
-                    image_url=image_url,
-                    title=title
-                )
-        except Exception as e:
-            logger.warning(f"Failed to upload featured image: {e}")
+        # 대표 이미지 업로드 제거 - 본문 이미지와 중복 방지
+        # featured_media_id = None
+        # try:
+        #     image_url = self.fetch_pexels_image(keyword)
+        #     if image_url:
+        #         featured_media_id = self.upload_image(
+        #             image_url=image_url,
+        #             title=title
+        #         )
+        # except Exception as e:
+        #     logger.warning(f"Failed to upload featured image: {e}")
 
         # 태그 생성 (generate_tags 함수 사용)
         if tags is None:
@@ -506,14 +507,14 @@ class WordPressPublisher:
 
         logger.info(f"Generated tags: {tags}")
 
-        # 글 발행
+        # 글 발행 (featured_media_id 제거)
         return self.publish_post(
             title=title,
             content=content,
             status=status,
             categories=categories,
             tags=tags,
-            featured_media_id=featured_media_id,
+            # featured_media_id=featured_media_id,  # 본문 이미지와 중복 방지
             excerpt=excerpt
         )
 
