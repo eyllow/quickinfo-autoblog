@@ -119,7 +119,7 @@ from .prompts import (
     CATEGORY_BADGE_TEMPLATE,
     HUMAN_PERSONA_PROMPT
 )
-from .template_prompts import generate_template_prompt, get_template_info_log
+from .template_prompts import generate_template_prompt, get_template_info_log, PERSON_TITLE_PROMPT
 from generators.humanizer import humanize_content
 from media.link_matcher import insert_related_links
 
@@ -390,9 +390,29 @@ class ContentGenerator:
         logger.info(f"Category classified: '{keyword}' -> {best_match} (template: {best_config.get('template', 'trend')})")
         return best_match, best_config
 
-    def generate_title(self, keyword: str) -> str:
-        """블로그 제목 생성 (현재 연도 동적 반영)"""
-        prompt = get_title_prompt(keyword)
+    def generate_title(self, keyword: str, news_data: str = "", is_person: bool = False) -> str:
+        """
+        블로그 제목 생성
+
+        Args:
+            keyword: 키워드
+            news_data: 뉴스/웹검색 데이터 (인물 키워드용)
+            is_person: 인물 키워드 여부
+
+        Returns:
+            생성된 제목
+        """
+        if is_person and news_data:
+            # 인물 전용 제목 프롬프트 사용
+            prompt = PERSON_TITLE_PROMPT.format(
+                keyword=keyword,
+                news_summary=news_data[:800]  # 뉴스 요약 전달
+            )
+            logger.info(f"Using person title prompt for: {keyword}")
+        else:
+            # 기존 제목 프롬프트
+            prompt = get_title_prompt(keyword)
+
         # 제목 생성에는 페르소나 미사용
         title = self._call_claude(prompt, max_tokens=200, use_persona=False)
         return title.strip().strip('"\'')
@@ -1019,10 +1039,17 @@ class ContentGenerator:
         elif category_name in web_search_categories:
             print(f"  └─ 검색 결과: 없음")
 
+        # Step 2.5: 인물 키워드 감지 (제목 생성 전에 필요)
+        is_person = is_person_keyword(keyword)
+        if is_person:
+            print(f"\n  👤 인물 키워드 감지: {keyword}")
+
         # Step 3: 제목 생성
         print(f"\n[Step 3/8] 제목 생성")
         print(f"  └─ Claude API 호출 중...")
-        title = self.generate_title(keyword)
+        # 인물 키워드면 뉴스 데이터 전달하여 팩트 기반 제목 생성
+        web_content_for_title = web_data.get("content", "")[:800] if web_data else ""
+        title = self.generate_title(keyword, news_data=web_content_for_title, is_person=is_person)
         print(f"  └─ 생성된 제목: {title}")
 
         # Step 4: 본문 생성 (템플릿 다양화 시스템 + 트렌드 맥락)
