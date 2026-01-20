@@ -123,7 +123,7 @@ def job_afternoon_trend():
 
 
 def job_evening_evergreen():
-    """오후 6:00~6:30 - 에버그린 키워드 1개"""
+    """오후 6:00~6:30 - 에버그린 키워드 1개 (시즌/트렌드 기반 선정)"""
     logger.info("=" * 60)
     logger.info("[18:00 시간대] 에버그린 발행 작업 시작")
     logger.info("=" * 60)
@@ -132,6 +132,25 @@ def job_evening_evergreen():
     delay = random_delay(0, 30)
 
     try:
+        # 시즌/트렌드 기반 키워드 미리 로깅
+        try:
+            from crawlers.evergreen_selector import EvergreenSelector
+            from datetime import datetime
+
+            selector = EvergreenSelector()
+            current_month = datetime.now().month
+            season_keywords = selector.get_current_season_keywords()
+
+            logger.info(f"현재 월: {current_month}월")
+            logger.info(f"시즌 키워드: {season_keywords[:5]}...")  # 처음 5개만
+
+            # 트렌드 에버그린 확인
+            trending_eg = selector.get_trending_evergreen()
+            if trending_eg:
+                logger.info(f"트렌드 에버그린 발견: {trending_eg}")
+        except Exception as e:
+            logger.warning(f"에버그린 선정 로깅 실패: {e}")
+
         logger.info(f"에버그린 키워드 1개 발행 시작 (딜레이: {delay}분)")
         run_pipeline(dry_run=False, posts_limit=1, evergreen=True)
         logger.info("[18:00 시간대] 발행 완료!")

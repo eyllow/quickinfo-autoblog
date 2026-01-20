@@ -93,34 +93,57 @@ def save_evergreen_index(index: int):
 
 def get_next_evergreen_keyword() -> str | None:
     """
-    다음 에버그린 키워드 반환 (순환)
-    이미 발행된 키워드는 건너뜀
+    다음 에버그린 키워드 반환
+
+    개선된 선정 로직:
+    1. 현재 시즌에 맞는 키워드 우선
+    2. 트렌드에서 에버그린 키워드 발견 시 우선 사용
+    3. priority (high > medium > low) 반영
+    4. 최근 7일 내 발행된 키워드 제외
     """
-    data = load_evergreen_keywords()
-    keywords = data.get("keywords", [])
-    last_index = data.get("last_index", 0)
+    try:
+        from crawlers.evergreen_selector import EvergreenSelector
 
-    if not keywords:
-        logger.warning("No evergreen keywords available")
-        return None
+        selector = EvergreenSelector()
+        keyword, reason = selector.get_keyword_for_publish()
 
-    published_keywords = set(db.get_published_keywords())
+        logger.info(f"에버그린 키워드 선정: {keyword} ({reason})")
+        return keyword
 
-    # 전체 키워드를 순환하며 미발행 키워드 찾기
-    for i in range(len(keywords)):
-        index = (last_index + i) % len(keywords)
-        keyword = keywords[index]
+    except Exception as e:
+        logger.error(f"EvergreenSelector 에러, 기존 방식 폴백: {e}")
 
-        if keyword not in published_keywords:
-            # 다음 인덱스 저장
-            save_evergreen_index((index + 1) % len(keywords))
-            return keyword
+        # 폴백: 기존 순환 방식
+        data = load_evergreen_keywords()
+        keywords = data.get("keywords", [])
+        last_index = data.get("last_index", 0)
 
-    # 모든 키워드가 발행된 경우, 가장 오래된 키워드부터 재발행
-    logger.info("All evergreen keywords published. Restarting from beginning.")
-    keyword = keywords[last_index % len(keywords)]
-    save_evergreen_index((last_index + 1) % len(keywords))
-    return keyword
+        if not keywords:
+            logger.warning("No evergreen keywords available")
+            return None
+
+        # 문자열/딕셔너리 혼합 처리
+        keyword_list = [
+            kw if isinstance(kw, str) else kw.get("keyword", "")
+            for kw in keywords
+        ]
+
+        published_keywords = set(db.get_published_keywords())
+
+        # 전체 키워드를 순환하며 미발행 키워드 찾기
+        for i in range(len(keyword_list)):
+            index = (last_index + i) % len(keyword_list)
+            keyword = keyword_list[index]
+
+            if keyword not in published_keywords:
+                save_evergreen_index((index + 1) % len(keyword_list))
+                return keyword
+
+        # 모든 키워드가 발행된 경우
+        logger.info("All evergreen keywords published. Restarting from beginning.")
+        keyword = keyword_list[last_index % len(keyword_list)]
+        save_evergreen_index((last_index + 1) % len(keyword_list))
+        return keyword
 
 
 def process_keyword(
