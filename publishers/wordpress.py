@@ -12,18 +12,26 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config.settings import settings
+from config.categories import (
+    get_category_for_keyword,
+    get_category_id,
+    get_category_name,
+    CATEGORY_IDS,
+)
 from generators.content_generator import clean_html_styles
 
 logger = logging.getLogger(__name__)
 
-# 카테고리별 추가 태그 매핑
+# 카테고리별 추가 태그 매핑 (4개 카테고리 체계)
 CATEGORY_TAGS = {
-    "IT테크": ["스마트폰", "리뷰", "스펙비교"],
-    "재테크": ["돈관리", "절세", "꿀팁"],
-    "건강": ["건강정보", "웰빙", "생활건강"],
-    "연예": ["연예뉴스", "엔터테인먼트"],
-    "생활정보": ["생활꿀팁", "정보공유"],
-    "취업교육": ["취업정보", "자기계발"],
+    "finance": ["재테크", "투자", "절세"],
+    "policy": ["지원금", "정부정책", "혜택"],
+    "life": ["생활정보", "실용정보"],
+    "trend": ["트렌드", "이슈"],
+    # 레거시 호환 (한글 카테고리명)
+    "재테크": ["재테크", "투자", "절세"],
+    "정책/지원금": ["지원금", "정부정책", "혜택"],
+    "생활정보": ["생활정보", "실용정보"],
     "트렌드": ["트렌드", "이슈"],
 }
 
@@ -320,7 +328,8 @@ class WordPressPublisher:
         categories: list[str] = None,
         tags: list[str] = None,
         featured_media_id: int = None,
-        excerpt: str = None
+        excerpt: str = None,
+        category_id: int = None
     ) -> PublishResult:
         """
         워드프레스에 글 발행
@@ -329,10 +338,11 @@ class WordPressPublisher:
             title: 글 제목
             content: HTML 본문
             status: 발행 상태 ('publish', 'draft', 'pending')
-            categories: 카테고리 목록
+            categories: 카테고리 목록 (레거시 호환)
             tags: 태그 목록
             featured_media_id: 대표 이미지 ID
             excerpt: 요약문
+            category_id: 카테고리 ID (직접 지정 - 우선 사용)
 
         Returns:
             PublishResult 객체
@@ -341,9 +351,14 @@ class WordPressPublisher:
             # 발행 전 HTML 스타일 정리 (왼쪽 검은 라인 등 제거)
             content = clean_html_styles(content)
 
-            # 카테고리 ID 변환
+            # 카테고리 ID 결정 (category_id 우선, 없으면 categories에서 변환)
             category_ids = []
-            if categories:
+            if category_id:
+                # 직접 지정된 category_id 사용
+                category_ids = [category_id]
+                logger.info(f"Using direct category ID: {category_id}")
+            elif categories:
+                # 레거시 호환: 문자열 카테고리를 ID로 변환
                 for cat in categories:
                     cat_id = self.get_or_create_category(cat)
                     if cat_id:
@@ -374,7 +389,7 @@ class WordPressPublisher:
             if excerpt:
                 post_data["excerpt"] = excerpt
 
-            logger.info(f"Publishing post: {title} (status: {status})")
+            logger.info(f"Publishing post: {title} (status: {status}, categories: {category_ids})")
 
             # 포스트 발행
             result = self._make_request("POST", "posts", data=post_data)
@@ -465,7 +480,8 @@ class WordPressPublisher:
         categories: list[str] = None,
         tags: list[str] = None,
         excerpt: str = None,
-        category: str = None
+        category: str = None,
+        category_id: int = None
     ) -> PublishResult:
         """
         이미지와 함께 글 발행
@@ -475,25 +491,21 @@ class WordPressPublisher:
             content: HTML 본문
             keyword: 키워드 (이미지 검색용)
             status: 발행 상태
-            categories: 카테고리 목록
+            categories: 카테고리 목록 (레거시 호환)
             tags: 태그 목록
             excerpt: 메타 설명 (요약문)
             category: 카테고리 이름 (태그 생성용)
+            category_id: 카테고리 ID (직접 지정 시)
 
         Returns:
             PublishResult 객체
         """
-        # 대표 이미지 업로드 제거 - 본문 이미지와 중복 방지
-        # featured_media_id = None
-        # try:
-        #     image_url = self.fetch_pexels_image(keyword)
-        #     if image_url:
-        #         featured_media_id = self.upload_image(
-        #             image_url=image_url,
-        #             title=title
-        #         )
-        # except Exception as e:
-        #     logger.warning(f"Failed to upload featured image: {e}")
+        # 카테고리 자동 배정 (키워드 기반)
+        if category_id is None and categories is None:
+            category_key, auto_category_id = get_category_for_keyword(keyword)
+            category_id = auto_category_id
+            category = category_key  # 태그 생성용
+            logger.info(f"Auto-assigned category: {get_category_name(category_key)} (ID: {category_id}) for keyword: {keyword}")
 
         # 태그 생성 (generate_tags 함수 사용)
         if tags is None:
@@ -507,30 +519,48 @@ class WordPressPublisher:
 
         logger.info(f"Generated tags: {tags}")
 
-        # 글 발행 (featured_media_id 제거)
+        # 글 발행 (category_id 직접 사용)
         return self.publish_post(
             title=title,
             content=content,
             status=status,
             categories=categories,
             tags=tags,
-            # featured_media_id=featured_media_id,  # 본문 이미지와 중복 방지
-            excerpt=excerpt
+            excerpt=excerpt,
+            category_id=category_id
         )
 
 
 if __name__ == "__main__":
     # 테스트
     logging.basicConfig(level=logging.INFO)
+
+    print("=== 카테고리 자동 배정 테스트 ===\n")
+
+    test_keywords = [
+        "2026 연말정산 환급",
+        "근로장려금 신청 방법",
+        "종합소득세 신고",
+        "손흥민 토트넘",
+        "엔비디아 주가 전망",
+    ]
+
+    for kw in test_keywords:
+        cat_key, cat_id = get_category_for_keyword(kw)
+        cat_name = get_category_name(cat_key)
+        print(f"{kw} → {cat_name} ({cat_key}, ID: {cat_id})")
+
+    print("\n=== WordPress 발행 테스트 ===\n")
+
     publisher = WordPressPublisher()
 
-    # 테스트 포스트 발행 (draft 모드)
-    result = publisher.publish_post(
-        title="테스트 포스트",
+    # 테스트 포스트 발행 (draft 모드) - 자동 카테고리 배정 테스트
+    result = publisher.publish_with_image(
+        title="테스트 포스트 - 연말정산",
         content="<p>이것은 테스트 포스트입니다.</p>",
-        status="draft",
-        categories=["테스트"],
-        tags=["테스트", "자동발행"]
+        keyword="연말정산 환급",
+        status="draft"
+        # categories 생략 시 자동 배정됨
     )
 
     if result.success:

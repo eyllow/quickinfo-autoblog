@@ -1,7 +1,7 @@
 {
   "categories": {
     "재테크": {
-      "keywords": ["연말정산", "청약", "대출", "적금", "주식", "부동산", "세금", "환급", "금리", "ETF", "펀드", "전세", "월세", "신용점수", "연금", "보험", "청년도약", "ISA", "배당", "투자", "비트코인", "암호화폐", "코인", "블록체인"],
+      "keywords": ["연말정산", "세액공제", "소득공제", "절세", "세금", "주가", "주식", "투자", "코인", "비트코인", "이더리움", "암호화폐", "엔비디아", "삼성전자", "테슬라", "애플", "증시", "코스피", "코스닥", "연금", "연금저축", "IRP", "ISA", "예금", "적금", "펀드", "금리", "대출", "청약", "주담대", "전세대출", "신용대출", "부동산", "전세", "월세", "아파트", "분양"],
       "template": "finance",
       "image_style": "ai_office",
       "requires_table": true,
@@ -9,56 +9,27 @@
       "requires_coupang": false,
       "priority": 1
     },
-    "IT테크": {
-      "keywords": ["아이폰", "갤럭시", "노트북", "맥북", "AI", "앱", "스마트폰", "챗GPT", "애플", "삼성", "구글", "테슬라", "전기차", "5G", "메타버스", "코딩", "프로그래밍"],
-      "template": "product",
-      "image_style": "ai_tech",
+    "정책/지원금": {
+      "keywords": ["근로장려금", "자녀장려금", "장려금", "지원금", "보조금", "수당", "급여", "청년", "청년도약", "청년내일", "청년정책", "청년통장", "복지", "국민연금", "기초연금", "육아휴직", "출산", "양육", "보육", "주거급여", "생계급여", "정부", "혜택"],
+      "template": "finance",
+      "image_style": "ai_office",
       "requires_table": true,
-      "requires_official_link": false,
-      "requires_coupang": true,
+      "requires_official_link": true,
+      "requires_coupang": false,
       "priority": 1
     },
-    "연예": {
-      "keywords": ["BTS", "아이돌", "드라마", "배우", "가수", "연예인", "콘서트", "블랙핑크", "트와이스", "뉴진스", "넷플릭스", "디즈니", "예능", "웹툰"],
-      "template": "celebrity",
-      "image_style": "ai_stage",
-      "image_count": 2,
-      "requires_table": false,
-      "requires_official_link": false,
-      "requires_coupang": false,
-      "warning": "실제 인물 사진 사용 금지. 이미지 최소화.",
-      "priority": 2
-    },
-    "건강": {
-      "keywords": ["다이어트", "운동", "영양제", "건강", "피부", "수면", "헬스", "비타민", "건강검진", "병원", "의료", "독감", "백신", "스트레스", "정신건강", "탈모"],
-      "template": "health",
-      "image_style": "ai_health",
-      "requires_table": true,
-      "requires_official_link": false,
-      "requires_coupang": true,
-      "requires_disclaimer": true,
-      "priority": 2
-    },
     "생활정보": {
-      "keywords": ["청소", "정리", "요리", "레시피", "꿀팁", "생활", "맛집", "여행", "호텔", "항공", "카페", "인테리어", "이사", "결혼", "육아", "반려동물", "자동차", "운전면허"],
+      "keywords": ["종합소득세", "부가가치세", "사업자", "실업급여", "고용보험", "퇴직금", "퇴직", "취업", "이직", "교통공사", "지하철", "버스", "공공기관", "보험", "건강보험", "자동차보험", "자동차", "이사", "전입신고", "주민등록", "운전면허", "아이폰", "갤럭시", "노트북", "스마트폰", "다이어트", "운동", "건강", "영양제", "여행", "맛집", "레시피", "인테리어"],
       "template": "lifestyle",
       "image_style": "ai_home",
       "requires_table": false,
       "requires_official_link": false,
       "requires_coupang": true,
-      "priority": 3
-    },
-    "취업교육": {
-      "keywords": ["취업", "이직", "면접", "자격증", "공무원", "토익", "영어", "대학", "수능", "입시", "학원", "온라인강의", "자기소개서"],
-      "template": "education",
-      "image_style": "ai_office",
-      "requires_table": true,
-      "requires_official_link": true,
-      "requires_coupang": false,
+      "requires_disclaimer": false,
       "priority": 2
     },
     "트렌드": {
-      "keywords": [],
+      "keywords": ["배우", "가수", "아이돌", "드라마", "영화", "예능", "뉴진스", "BTS", "블랙핑크", "에스파", "아이브", "넷플릭스", "디즈니", "웨이브", "축구", "야구", "농구", "테니스", "UFC", "레알마드리드", "손흥민", "오타니", "이강인", "김민재", "대통령", "선거", "정치", "국회", "검찰"],
       "template": "trend",
       "image_style": "ai_general",
       "requires_table": false,
