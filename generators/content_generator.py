@@ -117,7 +117,8 @@ from .prompts import (
     HEALTH_DISCLAIMER,
     AFFILIATE_NOTICE,
     CATEGORY_BADGE_TEMPLATE,
-    HUMAN_PERSONA_PROMPT
+    PROFESSIONAL_PERSONA,
+    post_process_content,
 )
 from .template_prompts import generate_template_prompt, get_template_info_log, PERSON_TITLE_PROMPT
 from generators.humanizer import humanize_content
@@ -331,15 +332,15 @@ class ContentGenerator:
             user_prompt: 사용자 프롬프트
             system_prompt: 시스템 프롬프트
             max_tokens: 최대 토큰 수
-            use_persona: 인간 페르소나 프롬프트 사용 여부
+            use_persona: 전문가 페르소나 프롬프트 사용 여부
 
         Returns:
             Claude 응답 텍스트
         """
         try:
-            # 인간 페르소나 프롬프트 추가 (AI 탐지 회피용)
+            # 전문가 페르소나 프롬프트 추가 (AdSense 최적화)
             if use_persona:
-                full_system_prompt = HUMAN_PERSONA_PROMPT + "\n\n" + system_prompt
+                full_system_prompt = PROFESSIONAL_PERSONA + "\n\n" + system_prompt
             else:
                 full_system_prompt = system_prompt
 
@@ -529,6 +530,9 @@ class ContentGenerator:
 
         # AI 메타 응답 제거
         content = clean_ai_response(content)
+
+        # AdSense 최적화 후처리 (금지 표현 제거, 이모지 제한)
+        content = post_process_content(content)
 
         # 인간화 처리 (AI 탐지 회피)
         content = humanize_full(content, keyword)
