@@ -15,8 +15,8 @@ from config.settings import settings
 from config.categories import (
     get_category_for_keyword,
     get_category_id,
-    get_category_name,
     CATEGORY_IDS,
+    CATEGORY_NAMES,
 )
 from generators.content_generator import clean_html_styles
 
@@ -502,10 +502,10 @@ class WordPressPublisher:
         """
         # 카테고리 자동 배정 (키워드 기반)
         if category_id is None and categories is None:
-            category_key, auto_category_id = get_category_for_keyword(keyword)
+            category_name, auto_category_id = get_category_for_keyword(keyword)
             category_id = auto_category_id
-            category = category_key  # 태그 생성용
-            logger.info(f"Auto-assigned category: {get_category_name(category_key)} (ID: {category_id}) for keyword: {keyword}")
+            category = category_name  # 태그 생성용
+            logger.info(f"카테고리 자동 배정: {keyword} → {category_name} (ID: {category_id})")
 
         # 태그 생성 (generate_tags 함수 사용)
         if tags is None:
@@ -543,27 +543,9 @@ if __name__ == "__main__":
         "종합소득세 신고",
         "손흥민 토트넘",
         "엔비디아 주가 전망",
+        "청년도약계좌 조건",
     ]
 
     for kw in test_keywords:
-        cat_key, cat_id = get_category_for_keyword(kw)
-        cat_name = get_category_name(cat_key)
-        print(f"{kw} → {cat_name} ({cat_key}, ID: {cat_id})")
-
-    print("\n=== WordPress 발행 테스트 ===\n")
-
-    publisher = WordPressPublisher()
-
-    # 테스트 포스트 발행 (draft 모드) - 자동 카테고리 배정 테스트
-    result = publisher.publish_with_image(
-        title="테스트 포스트 - 연말정산",
-        content="<p>이것은 테스트 포스트입니다.</p>",
-        keyword="연말정산 환급",
-        status="draft"
-        # categories 생략 시 자동 배정됨
-    )
-
-    if result.success:
-        print(f"Post published: {result.url}")
-    else:
-        print(f"Failed: {result.error}")
+        cat_name, cat_id = get_category_for_keyword(kw)
+        print(f"{kw} → {cat_name} (ID: {cat_id})")
