@@ -130,6 +130,39 @@ class Database:
                 for row in rows
             ]
 
+    def is_similar_keyword_published(self, keyword: str, days: int = 7) -> bool:
+        """
+        최근 N일 내 유사 키워드가 발행되었는지 확인 (부분 문자열 매칭)
+
+        Args:
+            keyword: 확인할 키워드
+            days: 조회 기간 (일)
+
+        Returns:
+            유사 키워드 존재 여부
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT keyword, title FROM published_posts
+                WHERE created_at >= datetime('now', ?)
+                """,
+                (f'-{days} days',)
+            )
+            for row in cursor.fetchall():
+                pub_keyword = row[0]
+                pub_title = row[1]
+                # 부분 문자열 매칭: 키워드가 서로 포함 관계
+                if keyword in pub_keyword or pub_keyword in keyword:
+                    logger.info(f"Similar keyword found: '{keyword}' ~ '{pub_keyword}'")
+                    return True
+                # 제목에 키워드가 포함되어 있는지
+                if keyword in pub_title:
+                    logger.info(f"Keyword found in recent title: '{keyword}' in '{pub_title}'")
+                    return True
+            return False
+
     def get_posts_count_today(self) -> int:
         """오늘 발행된 포스트 수 반환"""
         today = datetime.now().strftime("%Y-%m-%d")

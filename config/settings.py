@@ -62,6 +62,12 @@ class Settings(BaseSettings):
     # Claude 모델
     claude_model: str = "claude-3-5-haiku-20241022"
 
+    # Unsplash API 설정
+    unsplash_api_key: str = ""
+
+    # Pixabay API 설정
+    pixabay_api_key: str = ""
+
     # Pexels API URL
     pexels_api_url: str = "https://api.pexels.com/v1/search"
 
@@ -75,6 +81,11 @@ class Settings(BaseSettings):
         # GOOGLE_API_KEY 환경변수에서 gemini_api_key 로드
         if not self.gemini_api_key:
             self.gemini_api_key = os.getenv("GOOGLE_API_KEY", "")
+        # Unsplash / Pixabay API 키
+        if not self.unsplash_api_key:
+            self.unsplash_api_key = os.getenv("UNSPLASH_ACCESS_KEY", "")
+        if not self.pixabay_api_key:
+            self.pixabay_api_key = os.getenv("PIXABAY_API_KEY", "")
 
 
 # 싱글톤 설정 인스턴스

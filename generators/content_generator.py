@@ -794,16 +794,12 @@ class ContentGenerator:
             from urllib.parse import urlparse
             domain = urlparse(url).netloc
             favicon_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=64"
-            # 카드 색상
-            bg1, bg2 = get_card_colors(name)
             
             button_html = OFFICIAL_BUTTON_TEMPLATE.format(
                 url=url,
                 name=name,
                 description=description,
-                favicon_url=favicon_url,
-                bg_color_1=bg1,
-                bg_color_2=bg2
+                favicon_url=favicon_url
             )
             content = content.replace("[OFFICIAL_LINK]", button_html)
             logger.info(f"Official card link inserted: {name}")
@@ -1141,7 +1137,26 @@ class ContentGenerator:
         elif category_name in web_search_categories:
             print(f"  └─ 검색 결과: 없음")
 
-        # Step 2.5: 인물 키워드 감지 (제목 생성 전에 필요)
+        # Step 2.5a: 블로그 참조 분석
+        print(f"\n[Step 2.5a/8] 블로그 참조 분석")
+        blog_analysis = ""
+        try:
+            from crawlers.blog_reference import BlogReferenceCrawler
+            blog_ref = BlogReferenceCrawler()
+            blog_analysis = blog_ref.get_blog_analysis(keyword, count=3)
+            if blog_analysis:
+                print(f"  ✅ 블로그 참조 분석 완료")
+                # trend_context에 블로그 분석 추가
+                if not trend_context:
+                    trend_context = ""
+                trend_context += f"\n\n[참고 블로그 구조 분석]\n{blog_analysis}\n위 인기 블로그의 구조와 소제목 패턴을 참고하여 작성하세요."
+            else:
+                print(f"  ⚠️ 블로그 참조 결과 없음")
+        except Exception as e:
+            logger.warning(f"Blog reference failed: {e}")
+            print(f"  ⚠️ 블로그 참조 실패: {e}")
+
+        # Step 2.5b: 인물 키워드 감지 (제목 생성 전에 필요)
         is_person = is_person_keyword(keyword)
         if is_person:
             print(f"\n  👤 인물 키워드 감지: {keyword}")

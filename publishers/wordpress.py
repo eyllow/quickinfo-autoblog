@@ -531,6 +531,36 @@ class WordPressPublisher:
         )
 
 
+    def get_recent_post_titles(self, days: int = 7) -> list[tuple[str, str]]:
+        """
+        최근 발행된 포스트 제목과 슬러그 목록 반환
+
+        Args:
+            days: 조회할 기간 (일)
+
+        Returns:
+            (title, slug) 튜플 리스트
+        """
+        try:
+            from datetime import datetime, timedelta
+            after_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%dT00:00:00")
+
+            result = self._make_request(
+                "GET",
+                f"posts?per_page=50&status=publish&after={after_date}&_fields=title,slug"
+            )
+
+            if result:
+                return [
+                    (post.get("title", {}).get("rendered", ""), post.get("slug", ""))
+                    for post in result
+                ]
+        except Exception as e:
+            logger.warning(f"Failed to fetch recent post titles: {e}")
+
+        return []
+
+
 if __name__ == "__main__":
     # 테스트
     logging.basicConfig(level=logging.INFO)

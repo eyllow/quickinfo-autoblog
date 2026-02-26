@@ -538,7 +538,7 @@ smartphone technology modern"""
                 self.api_url,
                 headers=self.headers,
                 params=params,
-                timeout=30
+                timeout=5
             )
             response.raise_for_status()
 
@@ -548,6 +548,102 @@ smartphone technology modern"""
         except Exception as e:
             logger.error(f"Pexels search failed for '{query}': {e}")
             return []
+
+    def search_unsplash_single(self, query: str, per_page: int = 5) -> list:
+        """Unsplash API 폴백 검색"""
+        unsplash_key = settings.unsplash_api_key
+        if not unsplash_key:
+            return []
+        try:
+            resp = requests.get(
+                "https://api.unsplash.com/search/photos",
+                params={"query": query, "client_id": unsplash_key, "per_page": per_page, "orientation": "landscape"},
+                timeout=5
+            )
+            resp.raise_for_status()
+            results = resp.json().get("results", [])
+            # Pexels 형식에 맞게 변환
+            photos = []
+            for r in results:
+                photos.append({
+                    "id": r["id"],
+                    "src": {"large": r["urls"]["regular"], "medium": r["urls"]["small"]},
+                    "photographer": r.get("user", {}).get("name", "Unsplash"),
+                    "alt": r.get("alt_description", query),
+                    "width": r.get("width", 1200),
+                    "height": r.get("height", 800),
+                })
+            return photos
+        except Exception as e:
+            logger.warning(f"Unsplash search failed for '{query}': {e}")
+            return []
+
+    def search_pixabay_single(self, query: str, per_page: int = 5) -> list:
+        """Pixabay API 폴백 검색"""
+        pixabay_key = settings.pixabay_api_key
+        if not pixabay_key:
+            return []
+        try:
+            resp = requests.get(
+                "https://pixabay.com/api/",
+                params={"key": pixabay_key, "q": query, "image_type": "photo", "per_page": per_page, "min_width": 800},
+                timeout=5
+            )
+            resp.raise_for_status()
+            hits = resp.json().get("hits", [])
+            photos = []
+            for h in hits:
+                photos.append({
+                    "id": h["id"],
+                    "src": {"large": h["largeImageURL"], "medium": h.get("webformatURL", h["largeImageURL"])},
+                    "photographer": h.get("user", "Pixabay"),
+                    "alt": h.get("tags", query),
+                    "width": h.get("imageWidth", 1200),
+                    "height": h.get("imageHeight", 800),
+                })
+            return photos
+        except Exception as e:
+            logger.warning(f"Pixabay search failed for '{query}': {e}")
+            return []
+
+    def search_with_fallback(self, query: str, per_page: int = 5) -> list:
+        """
+        Pexels -> Unsplash -> Pixabay 폴백 체인으로 이미지 검색
+
+        모든 소스 실패 시 빈 리스트 반환
+        """
+        # 1. Pexels
+        photos = self.search_pexels_single(query, per_page)
+        if photos:
+            return photos
+
+        # 2. Unsplash 폴백
+        logger.info(f"Pexels empty, trying Unsplash for '{query}'")
+        photos = self.search_unsplash_single(query, per_page)
+        if photos:
+            return photos
+
+        # 3. Pixabay 폴백
+        logger.info(f"Unsplash empty, trying Pixabay for '{query}'")
+        photos = self.search_pixabay_single(query, per_page)
+        if photos:
+            return photos
+
+        logger.warning(f"All image sources failed for '{query}'")
+        return []
+
+    def generate_placeholder_div(self, keyword: str) -> str:
+        """모든 이미지 소스 실패 시 사용하는 컬러 div 플레이스홀더"""
+        colors = ["#e8f4f8", "#f0f7ff", "#fef3c7", "#ecfdf5", "#fce7f3"]
+        import random as _rand
+        bg = _rand.choice(colors)
+        return (
+            f'<div style="background: {bg}; padding: 40px; text-align: center; '
+            f'border-radius: 12px; margin: 30px 0; min-height: 200px; '
+            f'display: flex; align-items: center; justify-content: center;">'
+            f'<p style="color: #666; font-size: 18px; font-weight: 600;">{keyword}</p>'
+            f'</div>'
+        )
 
     def fetch_contextual_images(self, content: str, keyword: str) -> dict:
         """
@@ -585,7 +681,7 @@ smartphone technology modern"""
             print(f"  🖼️ IMAGE_{position}: {search_query}")
 
             # Pexels 검색
-            photos = self.search_pexels_single(search_query, per_page=8)
+            photos = self.search_with_fallback(search_query, per_page=8)
 
             if photos:
                 # 미사용 이미지 중 랜덤 선택
@@ -606,7 +702,7 @@ smartphone technology modern"""
             if f"IMAGE_{position}" not in images:
                 fallback_query = self._get_fallback_query(keyword)
                 print(f"      ⚠️ 폴백 검색: {fallback_query}")
-                fallback_photos = self.search_pexels_single(fallback_query, per_page=5)
+                fallback_photos = self.search_with_fallback(fallback_query, per_page=5)
 
                 if fallback_photos:
                     for photo in fallback_photos:
@@ -703,7 +799,7 @@ smartphone technology modern"""
 
         for keyword in image_keywords:
             # Pexels 검색 (여러 결과 중 미사용 이미지 선택)
-            photos = self.search_pexels_single(keyword, per_page=10)
+            photos = self.search_with_fallback(keyword, per_page=10)
 
             image_found = False
             for photo in photos:
@@ -728,7 +824,7 @@ smartphone technology modern"""
 
             # 검색 실패시 폴백
             if not image_found:
-                fallback_photos = self.search_pexels_single("modern lifestyle", per_page=10)
+                fallback_photos = self.search_with_fallback("modern lifestyle", per_page=10)
                 for photo in fallback_photos:
                     photo_id = photo.get("id")
                     img_url = photo.get("src", {}).get("large") or photo.get("src", {}).get("medium", "")
@@ -756,7 +852,7 @@ smartphone technology modern"""
 
         for i in range(1, count + 1):
             query = search_keywords[(i - 1) % len(search_keywords)]
-            photos = self.search_pexels_single(query, per_page=5)
+            photos = self.search_with_fallback(query, per_page=5)
 
             if photos:
                 for photo in photos:
@@ -1056,7 +1152,7 @@ smartphone technology modern"""
                 print(f"  🖼️ IMAGE_{position}: {search_query}")
 
                 # Pexels 검색
-                photos = self.search_pexels_single(search_query, per_page=8)
+                photos = self.search_with_fallback(search_query, per_page=8)
 
                 if photos:
                     for photo in photos:
@@ -1077,7 +1173,7 @@ smartphone technology modern"""
                 if f"IMAGE_{position}" not in images:
                     fallback_query = self._get_fallback_query(keyword)
                     print(f"      ⚠️ 폴백 검색: {fallback_query}")
-                    fallback_photos = self.search_pexels_single(fallback_query, per_page=5)
+                    fallback_photos = self.search_with_fallback(fallback_query, per_page=5)
 
                     if fallback_photos:
                         for photo in fallback_photos:
@@ -1108,7 +1204,7 @@ smartphone technology modern"""
                 query = search_keywords[i % len(search_keywords)]
                 print(f"  🖼️ IMAGE_{next_position}: {query}")
 
-                photos = self.search_pexels_single(query, per_page=8)
+                photos = self.search_with_fallback(query, per_page=8)
 
                 if photos:
                     for photo in photos:

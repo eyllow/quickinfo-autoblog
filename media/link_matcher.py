@@ -81,24 +81,35 @@ class LinkMatcher:
 
     def generate_link_button_html(self, site: Dict) -> str:
         """
-        클릭 유도 버튼 HTML 생성
+        깔끔한 레퍼런스 스타일 링크 카드 HTML 생성
 
         Args:
             site: 사이트 정보 딕셔너리
 
         Returns:
-            버튼 HTML 문자열
+            카드 HTML 문자열
         """
+        from urllib.parse import urlparse
+        domain = urlparse(site['url']).netloc
         return f'''
-<div style="text-align: center; margin: 30px 0;">
-    <a href="{site['url']}" target="_blank" rel="noopener noreferrer"
-       style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-              color: white; padding: 15px 30px; text-decoration: none;
-              border-radius: 8px; font-weight: bold; font-size: 16px;
-              box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);">
-        {site['name']} 바로가기
-    </a>
-    <p style="margin-top: 10px; color: #666; font-size: 14px;">{site.get('description', '')}</p>
+<div style="margin: 24px 0; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+  <a href="{site['url']}" target="_blank" rel="noopener noreferrer" style="text-decoration: none; display: block; padding: 20px 24px;">
+    <table style="width: 100%; border: none; border-collapse: collapse;">
+      <tr>
+        <td style="width: 56px; vertical-align: middle; padding-right: 16px;">
+          <div style="width: 48px; height: 48px; background: #f1f5f9; border-radius: 10px; text-align: center; line-height: 48px;">
+            <img src="https://www.google.com/s2/favicons?domain={domain}&sz=32" alt="" style="width: 32px; height: 32px; vertical-align: middle;" onerror="this.style.display=\'none\'" />
+          </div>
+        </td>
+        <td style="vertical-align: middle;">
+          <p style="margin: 0 0 4px 0; font-size: 16px; font-weight: 700; color: #1a202c;">{site['name']}</p>
+          <p style="margin: 0; font-size: 13px; color: #64748b;">{site.get('description', '')}</p>
+          <p style="margin: 4px 0 0 0; font-size: 12px; color: #94a3b8;">{domain}</p>
+        </td>
+        <td style="width: 32px; vertical-align: middle; text-align: right; color: #94a3b8; font-size: 20px;">&#8594;</td>
+      </tr>
+    </table>
+  </a>
 </div>
 '''
 
@@ -116,7 +127,7 @@ class LinkMatcher:
 
     def insert_link_into_content(self, content: str, keyword: str) -> str:
         """
-        콘텐츠에 관련 사이트 링크 버튼 자동 삽입
+        콘텐츠에 관련 사이트 링크 카드 자동 삽입 (최대 3개)
 
         Args:
             content: HTML 콘텐츠
@@ -127,38 +138,37 @@ class LinkMatcher:
         """
         import re
 
-        site = self.get_primary_site(keyword)
-        if not site:
+        sites = self.find_matching_sites(keyword)
+        if not sites:
             logger.info(f"관련 사이트 없음: {keyword}")
             return content
 
-        # 버튼 HTML 생성
-        button_html = self.generate_link_button_html(site)
+        # 최대 3개 사이트
+        sites = sites[:3]
+
+        # 모든 카드 HTML 합치기
+        cards_html = "\n".join(self.generate_link_button_html(site) for site in sites)
 
         # 삽입 위치 결정: 두 번째 또는 첫 번째 섹션 헤더 뒤
         headers = list(re.finditer(r'</h[23]>', content))
 
         if len(headers) >= 2:
-            # 두 번째 헤더 뒤에 삽입
             insert_pos = headers[1].end()
-            content = content[:insert_pos] + button_html + content[insert_pos:]
-            logger.info(f"링크 버튼 삽입 완료 (위치: 두 번째 헤더 뒤)")
+            content = content[:insert_pos] + cards_html + content[insert_pos:]
+            logger.info(f"링크 카드 {len(sites)}개 삽입 완료 (위치: 두 번째 헤더 뒤)")
         elif len(headers) >= 1:
-            # 첫 번째 헤더 뒤에 삽입
             insert_pos = headers[0].end()
-            content = content[:insert_pos] + button_html + content[insert_pos:]
-            logger.info(f"링크 버튼 삽입 완료 (위치: 첫 번째 헤더 뒤)")
+            content = content[:insert_pos] + cards_html + content[insert_pos:]
+            logger.info(f"링크 카드 {len(sites)}개 삽입 완료 (위치: 첫 번째 헤더 뒤)")
         else:
-            # 헤더 없으면 첫 번째 </p> 태그 뒤에 삽입
             p_match = re.search(r'</p>', content)
             if p_match:
                 insert_pos = p_match.end()
-                content = content[:insert_pos] + button_html + content[insert_pos:]
-                logger.info(f"링크 버튼 삽입 완료 (위치: 첫 번째 문단 뒤)")
+                content = content[:insert_pos] + cards_html + content[insert_pos:]
+                logger.info(f"링크 카드 {len(sites)}개 삽입 완료 (위치: 첫 번째 문단 뒤)")
             else:
-                # 그래도 없으면 맨 앞에 삽입
-                content = button_html + content
-                logger.info(f"링크 버튼 삽입 완료 (위치: 맨 앞)")
+                content = cards_html + content
+                logger.info(f"링크 카드 {len(sites)}개 삽입 완료 (위치: 맨 앞)")
 
         return content
 

@@ -285,25 +285,57 @@ def run_pipeline(
                 keywords.append(kw)
         logger.info(f"Evergreen keywords: {keywords}")
     else:
-        # 트렌드 키워드 가져오기
-        logger.info("Fetching trending keywords from Google Trends...")
-        all_keywords = trends_crawler.get_trending_keywords_simple(limit=20)
-        logger.info(f"Fetched {len(all_keywords)} keywords")
-
-        if not all_keywords:
-            logger.warning("No trending keywords found. Exiting.")
-            return
-
-        # 미발행 키워드 필터링
-        keywords = get_unpublished_keywords(all_keywords, limit=posts_count)
-        logger.info(f"Unpublished keywords: {keywords}")
+        # 주제 선정 알고리즘 (다중 소스 + 스코어링)
+        logger.info("Selecting best keywords with TopicSelector...")
+        try:
+            from crawlers.topic_selector import TopicSelector
+            topic_selector = TopicSelector()
+            keywords = topic_selector.get_best_keywords(limit=posts_count)
+            logger.info(f"TopicSelector keywords: {keywords}")
+        except Exception as e:
+            logger.warning(f"TopicSelector failed, falling back to Google Trends: {e}")
+            all_keywords = trends_crawler.get_trending_keywords_simple(limit=20)
+            keywords = get_unpublished_keywords(all_keywords, limit=posts_count)
 
         if not keywords:
-            logger.info("All keywords already published. Exiting.")
+            logger.info("No suitable keywords found. Exiting.")
             return
 
     if not keywords:
         logger.warning("No keywords to process. Exiting.")
+        return
+
+    # 중복 발행 방지: WP 최근 글 제목 + DB 유사 키워드 체크
+    if not specific_keyword:
+        try:
+            recent_titles = wp_publisher.get_recent_post_titles(days=7)
+            recent_title_texts = [t[0].lower() for t in recent_titles]
+            logger.info(f"Recent WP posts: {len(recent_titles)}")
+
+            filtered_keywords = []
+            for kw in keywords:
+                # WP 제목에서 중복 체크
+                is_dup = False
+                for title_text in recent_title_texts:
+                    if kw.lower() in title_text or title_text in kw.lower():
+                        logger.info(f"Skipping '{kw}' - similar to recent WP title")
+                        is_dup = True
+                        break
+                if is_dup:
+                    continue
+                # DB 유사 키워드 체크
+                if db.is_similar_keyword_published(kw, days=7):
+                    logger.info(f"Skipping '{kw}' - similar keyword in DB")
+                    continue
+                filtered_keywords.append(kw)
+
+            logger.info(f"After dedup filter: {len(filtered_keywords)}/{len(keywords)} keywords")
+            keywords = filtered_keywords
+        except Exception as e:
+            logger.warning(f"Dedup check failed, proceeding with all keywords: {e}")
+
+    if not keywords:
+        logger.info("All keywords filtered by dedup. Exiting.")
         return
 
     # 키워드별 처리

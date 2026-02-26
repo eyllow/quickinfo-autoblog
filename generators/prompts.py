@@ -748,26 +748,22 @@ def get_template(template_name: str, is_evergreen: bool = False, keyword: str = 
 # =============================================================================
 
 OFFICIAL_BUTTON_TEMPLATE = '''
-<div style="margin: 30px 0; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.08); border: 1px solid #e0e0e0;">
-  <a href="{url}" target="_blank" rel="noopener" style="text-decoration: none; display: block;">
-    <div style="background: linear-gradient(135deg, {bg_color_1} 0%, {bg_color_2} 100%); padding: 24px;">
-      <table style="width: 100%; border: none; border-collapse: collapse;">
-        <tr>
-          <td style="width: 56px; vertical-align: middle; padding-right: 16px;">
-            <div style="width: 48px; height: 48px; background: white; border-radius: 10px; text-align: center; line-height: 48px;">
-              <img src="{favicon_url}" alt="" style="width: 28px; height: 28px; vertical-align: middle;" onerror="this.style.display=\'none\'" />
-            </div>
-          </td>
-          <td style="vertical-align: middle;">
-            <p style="font-size: 17px; font-weight: 700; color: white; margin: 0 0 4px 0;">{name}</p>
-            <p style="font-size: 13px; color: rgba(255,255,255,0.85); margin: 0;">{description}</p>
-          </td>
-          <td style="width: 100px; vertical-align: middle; text-align: right;">
-            <span style="background: rgba(255,255,255,0.25); color: white; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; white-space: nowrap;">바로가기 →</span>
-          </td>
-        </tr>
-      </table>
-    </div>
+<div style="margin: 24px 0; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+  <a href="{url}" target="_blank" rel="noopener noreferrer" style="text-decoration: none; display: block; padding: 20px 24px;">
+    <table style="width: 100%; border: none; border-collapse: collapse;">
+      <tr>
+        <td style="width: 56px; vertical-align: middle; padding-right: 16px;">
+          <div style="width: 48px; height: 48px; background: #f1f5f9; border-radius: 10px; text-align: center; line-height: 48px;">
+            <img src="{favicon_url}" alt="" style="width: 32px; height: 32px; vertical-align: middle;" onerror="this.style.display=\'none\'" />
+          </div>
+        </td>
+        <td style="vertical-align: middle;">
+          <p style="margin: 0 0 4px 0; font-size: 16px; font-weight: 700; color: #1a202c;">{name}</p>
+          <p style="margin: 0; font-size: 13px; color: #64748b;">{description}</p>
+        </td>
+        <td style="width: 32px; vertical-align: middle; text-align: right; color: #94a3b8; font-size: 20px;">&#8594;</td>
+      </tr>
+    </table>
   </a>
 </div>
 '''
