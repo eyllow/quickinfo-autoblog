@@ -490,7 +490,11 @@ class ContentGenerator:
             title = title.strip().strip('"\'')
             # 여전히 짧으면 키워드 직접 활용
             if len(title) < 15:
-                title = f"{keyword} 총정리, 꼭 알아야 할 핵심 정보"
+                title = f"{keyword}, 꼭 알아야 할 핵심 정보"
+        
+        # 제목 중복 단어 제거 (예: "총정리 총정리" → "총정리")
+        import re as _re
+        title = _re.sub(r'(\S+)\s+\1', r'\1', title)
         
         return title
 
@@ -774,7 +778,20 @@ class ContentGenerator:
                 content = re.sub(pattern2, img_html, content, count=1)
                 logger.info(f"Inserted {tag} (tag only): {img_data['search_query']}")
             else:
-                logger.warning(f"Tag {tag} not found in content")
+                logger.warning(f"Tag {tag} not found in content, inserting at section break")
+                # 태그가 없으면 적절한 h3/h2 헤더 뒤에 삽입
+                headers = list(re.finditer(r'</h[23]>', content))
+                tag_idx = int(tag_num) if tag_num.isdigit() else 1
+                # tag_idx번째 헤더 뒤에 삽입 (없으면 마지막 헤더 뒤)
+                if headers:
+                    insert_after = min(tag_idx, len(headers)) - 1
+                    pos = headers[insert_after].end()
+                    # 바로 뒤에 <p> 있으면 그 문단 뒤에 삽입
+                    next_p = re.search(r'</p>', content[pos:])
+                    if next_p:
+                        pos = pos + next_p.end()
+                    content = content[:pos] + img_html + content[pos:]
+                    logger.info(f"Force-inserted {tag} after header #{insert_after+1}")
 
         # 남은 IMG_CONTEXT 주석 및 이미지 태그 제거 (확장 패턴)
         content = re.sub(r'<!-- IMG_CONTEXT: .+? -->\s*', '', content)
