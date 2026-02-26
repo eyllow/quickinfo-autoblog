@@ -257,7 +257,7 @@ class ImageFetcher:
                     self.api_url,
                     headers=self.headers,
                     params=params,
-                    timeout=10
+                    timeout=30
                 )
                 response.raise_for_status()
 
@@ -352,13 +352,13 @@ class ImageFetcher:
             return False
 
         try:
-            response = requests.head(url, timeout=10, allow_redirects=True)
+            response = requests.head(url, timeout=30, allow_redirects=True)
             if response.status_code == 200:
                 content_type = response.headers.get('Content-Type', '')
                 if 'image' in content_type:
                     return True
             # HEAD 실패 시 GET으로 재시도 (일부 서버는 HEAD 미지원)
-            response = requests.get(url, timeout=10, stream=True)
+            response = requests.get(url, timeout=30, stream=True)
             response.close()
             return response.status_code == 200
         except Exception as e:
@@ -538,7 +538,7 @@ smartphone technology modern"""
                 self.api_url,
                 headers=self.headers,
                 params=params,
-                timeout=10
+                timeout=30
             )
             response.raise_for_status()
 
