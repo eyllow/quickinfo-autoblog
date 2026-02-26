@@ -767,13 +767,42 @@ def get_template(template_name: str, is_evergreen: bool = False, keyword: str = 
 # =============================================================================
 
 OFFICIAL_BUTTON_TEMPLATE = '''
-<div style="margin: 30px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; text-align: left;">
-    <p style="font-size: 15px; font-weight: 600; color: #333; margin: 0 0 10px 0;">📌 공식 사이트 안내</p>
-    <p style="font-size: 14px; color: #555; margin: 0;">
-        👉 <a href="{url}" target="_blank" rel="noopener" style="color: #1a73e8; text-decoration: none; font-weight: 500;">{name} 공식 홈페이지</a>
-    </p>
+<div style="margin: 30px 0; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.08); border: 1px solid #e8e8e8;">
+    <a href="{url}" target="_blank" rel="noopener" style="text-decoration: none; display: block;">
+        <div style="background: linear-gradient(135deg, {bg_color_1} 0%, {bg_color_2} 100%); padding: 28px 24px; display: flex; align-items: center; gap: 16px;">
+            <div style="width: 56px; height: 56px; background: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <img src="{favicon_url}" alt="{name}" style="width: 32px; height: 32px; border-radius: 4px;" onerror="this.style.display='none';this.parentElement.innerHTML='🏛️';" />
+            </div>
+            <div>
+                <p style="font-size: 18px; font-weight: 700; color: white; margin: 0 0 4px 0; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">{name}</p>
+                <p style="font-size: 13px; color: rgba(255,255,255,0.85); margin: 0;">{description}</p>
+            </div>
+            <div style="margin-left: auto; flex-shrink: 0;">
+                <span style="background: rgba(255,255,255,0.25); color: white; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600;">바로가기 →</span>
+            </div>
+        </div>
+    </a>
 </div>
 '''
+
+# 카드 색상 세트 (사이트별 브랜딩)
+CARD_COLOR_SETS = {
+    "default": ("#4A90D9", "#357ABD"),
+    "정부": ("#1B5E97", "#0D47A1"),
+    "세금": ("#2E7D32", "#1B5E20"),
+    "고용": ("#E65100", "#BF360C"),
+    "건강": ("#00838F", "#006064"),
+    "교육": ("#6A1B9A", "#4A148C"),
+    "금융": ("#1565C0", "#0D47A1"),
+    "복지": ("#AD1457", "#880E4F"),
+}
+
+def get_card_colors(name: str) -> tuple:
+    """사이트명에 따른 카드 색상 반환"""
+    for key, colors in CARD_COLOR_SETS.items():
+        if key in name:
+            return colors
+    return CARD_COLOR_SETS["default"]
 
 COUPANG_BUTTON_TEMPLATE = '''
 <div style="text-align: center; margin: 30px 0;">

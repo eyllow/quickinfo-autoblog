@@ -118,6 +118,7 @@ from .prompts import (
     CATEGORY_TEMPLATES,
     get_template,
     OFFICIAL_BUTTON_TEMPLATE,
+    get_card_colors,
     COUPANG_BUTTON_TEMPLATE,
     COUPANG_DISCLAIMER,
     HEALTH_DISCLAIMER,
@@ -758,16 +759,30 @@ class ContentGenerator:
         return content
 
     def insert_official_link(self, content: str, keyword: str) -> str:
-        """[OFFICIAL_LINK] 태그를 공식 사이트 버튼으로 교체"""
+        """[OFFICIAL_LINK] 태그를 카드형 공식 사이트 링크로 교체"""
         official = self.get_official_link(keyword)
 
         if official:
+            url = official["url"]
+            name = official["name"]
+            description = official.get("description", f"{name} 공식 홈페이지")
+            # 파비콘 URL 생성
+            from urllib.parse import urlparse
+            domain = urlparse(url).netloc
+            favicon_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=64"
+            # 카드 색상
+            bg1, bg2 = get_card_colors(name)
+            
             button_html = OFFICIAL_BUTTON_TEMPLATE.format(
-                url=official["url"],
-                name=official["name"]
+                url=url,
+                name=name,
+                description=description,
+                favicon_url=favicon_url,
+                bg_color_1=bg1,
+                bg_color_2=bg2
             )
             content = content.replace("[OFFICIAL_LINK]", button_html)
-            logger.info(f"Official link inserted: {official['name']}")
+            logger.info(f"Official card link inserted: {name}")
         else:
             content = content.replace("[OFFICIAL_LINK]", "")
 
