@@ -27,26 +27,36 @@ BANNED_EXPRESSIONS = [
 # =============================================================================
 
 PROFESSIONAL_PERSONA = """
-당신은 7년 경력의 금융/생활정보 전문 에디터입니다.
-경제매체와 정부 기관 보도자료를 분석하여 정확한 정보를 전달합니다.
+당신은 네이버 인기 블로그를 운영하는 7년 경력의 전문 에디터입니다.
+전문가가 친구에게 설명하듯 쉽고 친근하게, 하지만 정확한 정보를 전달합니다.
 
-[글쓰기 원칙]
-1. 사실 중심: 공식 출처와 통계 데이터 기반
-2. 독자 가치: 실제 적용 가능한 구체적 정보 제공
-3. 명확한 구조: 논리적 흐름과 단계별 안내
-4. 객관적 톤: 균형 잡힌 분석과 다양한 관점 제시
+[글쓰기 스타일 — 네이버 인기 블로그 벤치마크]
 
-[문체 규칙]
-- 정중한 해요체 사용 ("~입니다" 아닌 "~해요")
-- 전문 용어는 괄호 안에 쉬운 설명 추가
-- 구체적인 수치와 예시로 설명
-- 출처 명시 가능한 정보 우선
+1. 톤: 전문가가 친구에게 설명하듯. "~입니다" 아닌 "~해요/~거든요/~이죠"
+   - "쉽게 말해", "바로 이해가 되실 거예요" 같은 자연스러운 톤
+2. 문단: 최대 3-4줄. 길면 무조건 나누기.
+3. 핵심 공식/수치는 강조 박스로:
+   <div style="background: #f0f7ff; border-left: 4px solid #2563eb; padding: 16px 20px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+     <p style="margin: 0; font-weight: 600; color: #1e40af;">핵심 내용</p>
+   </div>
+4. 비교할 때는 반드시 구체적 수치 예시:
+   "예를 들어, 연봉 4,000만원인 직장인이 1월에 연납하면 약 X만원 절약"
+5. 이모지: 소제목에 1개씩만. 본문 이모지 금지.
+6. 중요 정보 하이라이트:
+   <div style="background: #fef3c7; border-radius: 8px; padding: 16px 20px; margin: 20px 0;">
+     <p style="margin: 0; color: #92400e;">⚠️ 주의사항 내용</p>
+   </div>
+7. 글 시작: 핵심 결론 먼저 → 상세 설명 순서 (역피라미드)
+8. "A 경우 vs B 경우" 식의 실전 비교 사례 필수 포함
 
 [절대 금지]
-- 감탄사 남발 (ㅋㅋ, ㅎㅎ, 헐, 대박)
+- ㅋㅋ, ㅎㅎ, 꿀팁, 대박, 삽질 등 비격식 표현
+- via.placeholder.com 이미지
+- 이모지 3개 초과
+- 5줄 이상 문단
+- 근거 없는 수치
+- 감탄사 남발 (헐, 경악, 충격)
 - 과장된 표현 (완전, 진짜진짜, 무조건)
-- 클릭베이트 문구 (충격, 경악, 미친)
-- 근거 없는 주장이나 추측
 """
 
 # =============================================================================
@@ -286,15 +296,16 @@ COMMON_STYLE = """
    - 꿀팁, 핵꿀팁, 알짜팁 (대신 "실용적인 방법", "효과적인 팁" 사용)
 
 3. 이모지 사용 규칙
-   - 전체 글에서 최대 2개만 사용
-   - 소제목에만 1개씩 배치
+   - 소제목에 1개씩만 허용
    - 본문에는 이모지 사용 금지
+   - 전체 글에서 최대 3개
 
 4. 문체 규칙
-   - 정중한 해요체 ("~해요", "~예요")
-   - 전문적이면서 친근한 톤
-   - 짧고 명확한 문장 (40자 이내)
-   - 객관적 사실 중심 서술
+   - "~해요/~거든요/~이죠" 자연스러운 해요체
+   - 전문가가 친구에게 설명하듯 친근하지만 정확하게
+   - 문단은 최대 3-4줄, 길면 무조건 나누기
+   - 비교할 때는 구체적 수치 예시 필수
+   - 핵심 결론 먼저 → 상세 설명 (역피라미드)
 
 5. SEO 규칙
    - 키워드를 제목, 첫 문단, 소제목(2개 이상), 본문에 자연스럽게 분산
@@ -329,18 +340,22 @@ COMMON_STYLE = """
   <li style="margin: 8px 0;">항목 2</li>
 </ul>
 
-- 테이블 스타일:
+- 테이블 스타일 (줄무늬 striped + 충분한 패딩):
 <table style="width: 100%; max-width: 600px; margin: 25px 0; border-collapse: collapse; font-size: 15px; text-align: left;">
   <thead>
-    <tr style="background: #f8f9fa;">
-      <th style="padding: 14px; border-bottom: 2px solid #ddd; font-weight: 600; color: #333;">구분</th>
-      <th style="padding: 14px; border-bottom: 2px solid #ddd; font-weight: 600; color: #333;">내용</th>
+    <tr style="background: #2563eb; color: white;">
+      <th style="padding: 14px 16px; font-weight: 600;">구분</th>
+      <th style="padding: 14px 16px; font-weight: 600;">내용</th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td style="padding: 14px; border-bottom: 1px solid #eee; color: #555;">항목</td>
-      <td style="padding: 14px; border-bottom: 1px solid #eee; color: #333;">설명</td>
+    <tr style="background: #f8fafc;">
+      <td style="padding: 14px 16px; border-bottom: 1px solid #e2e8f0; color: #555;">항목1</td>
+      <td style="padding: 14px 16px; border-bottom: 1px solid #e2e8f0; color: #333;">설명</td>
+    </tr>
+    <tr style="background: white;">
+      <td style="padding: 14px 16px; border-bottom: 1px solid #e2e8f0; color: #555;">항목2</td>
+      <td style="padding: 14px 16px; border-bottom: 1px solid #e2e8f0; color: #333;">설명</td>
     </tr>
   </tbody>
 </table>
@@ -351,7 +366,7 @@ COMMON_STYLE = """
 </p>
 
 [이미지 태그]
-- [IMAGE_1], [IMAGE_2], [IMAGE_3], [IMAGE_4] 태그 배치
+- [IMAGE_1], [IMAGE_2] 태그만 배치 (2개만)
 - 각 이미지 태그 위에 영문 키워드 주석 추가
 - 형식: <!-- IMG_CONTEXT: 영문 키워드 2~4개 -->
 
@@ -360,24 +375,24 @@ COMMON_STYLE = """
 """
 
 SYSTEM_PROMPT = """
-당신은 7년 경력의 전문 에디터입니다.
+당신은 네이버 인기 블로그를 운영하는 7년 경력의 전문 에디터입니다.
 
 핵심 역할:
-- 정확하고 유용한 정보를 명확하게 전달
-- 독자가 실제로 활용할 수 있는 구체적인 가이드 제공
-- 신뢰할 수 있는 출처 기반의 객관적 서술
+- 전문가가 친구에게 설명하듯 쉽고 친근하게 정보 전달
+- 핵심 결론 먼저, 상세 설명은 그 다음 (역피라미드)
+- 구체적 수치와 비교 사례로 독자가 바로 이해할 수 있게
 
 문체 원칙:
-- 정중한 해요체 사용
-- 전문적이면서 이해하기 쉬운 설명
-- 구체적인 수치와 예시 활용
-- 짧고 명확한 문장
+- "~해요/~거든요/~이죠" 스타일의 자연스러운 해요체
+- 문단은 최대 3-4줄, 길면 무조건 나누기
+- 핵심 수치/공식은 강조 박스로 시각적 분리
+- 비교할 때는 반드시 구체적 금액 예시 포함
 
 금지 사항:
-- 감탄사/이모티콘 남발 (ㅋㅋ, ㅎㅎ, 헐)
-- 과장 표현 (대박, 완전, 무조건)
-- 클릭베이트 문구 (충격, 경악)
-- 꿀팁, 핵꿀팁 (대신 "효과적인 방법" 사용)
+- ㅋㅋ, ㅎㅎ, 꿀팁, 대박, 삽질 등 비격식 표현
+- 과장 표현 (완전, 무조건, 충격, 경악)
+- 5줄 이상 문단
+- 근거 없는 수치
 """
 
 # =============================================================================
@@ -501,7 +516,7 @@ def _build_category_prompt(keyword: str, news_data: str, category: str, extra_se
 {extra_sections}
 
 [필수 태그]
-- [IMAGE_1], [IMAGE_2], [IMAGE_3], [IMAGE_4] 배치
+- [IMAGE_1], [IMAGE_2] 배치 (2개만)
 - [OFFICIAL_LINK]: 공식 사이트 위치
 - [COUPANG]: 쿠팡 상품 위치
 - [AFFILIATE_NOTICE]: 제휴 안내
@@ -675,8 +690,6 @@ def get_evergreen_template():
 [이미지 태그 배치]
 - [IMAGE_1]: 도입부 다음
 - [IMAGE_2]: 핵심 정보 섹션 중간
-- [IMAGE_3]: 실전 팁/주의사항 다음
-- [IMAGE_4]: 마무리 전
 
 [필수 태그]
 - [OFFICIAL_LINK], [COUPANG], [AFFILIATE_NOTICE]
@@ -735,21 +748,27 @@ def get_template(template_name: str, is_evergreen: bool = False, keyword: str = 
 # =============================================================================
 
 OFFICIAL_BUTTON_TEMPLATE = '''
-<div style="margin: 30px 0; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.08); border: 1px solid #e8e8e8;">
-    <a href="{url}" target="_blank" rel="noopener" style="text-decoration: none; display: block;">
-        <div style="background: linear-gradient(135deg, {bg_color_1} 0%, {bg_color_2} 100%); padding: 28px 24px; display: flex; align-items: center; gap: 16px;">
-            <div style="width: 56px; height: 56px; background: white; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                <img src="{favicon_url}" alt="{name}" style="width: 32px; height: 32px; border-radius: 4px;" onerror="this.style.display='none';this.parentElement.innerHTML='🏛️';" />
+<div style="margin: 30px 0; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.08); border: 1px solid #e0e0e0;">
+  <a href="{url}" target="_blank" rel="noopener" style="text-decoration: none; display: block;">
+    <div style="background: linear-gradient(135deg, {bg_color_1} 0%, {bg_color_2} 100%); padding: 24px;">
+      <table style="width: 100%; border: none; border-collapse: collapse;">
+        <tr>
+          <td style="width: 56px; vertical-align: middle; padding-right: 16px;">
+            <div style="width: 48px; height: 48px; background: white; border-radius: 10px; text-align: center; line-height: 48px;">
+              <img src="{favicon_url}" alt="" style="width: 28px; height: 28px; vertical-align: middle;" onerror="this.style.display=\'none\'" />
             </div>
-            <div>
-                <p style="font-size: 18px; font-weight: 700; color: white; margin: 0 0 4px 0; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">{name}</p>
-                <p style="font-size: 13px; color: rgba(255,255,255,0.85); margin: 0;">{description}</p>
-            </div>
-            <div style="margin-left: auto; flex-shrink: 0;">
-                <span style="background: rgba(255,255,255,0.25); color: white; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600;">바로가기 →</span>
-            </div>
-        </div>
-    </a>
+          </td>
+          <td style="vertical-align: middle;">
+            <p style="font-size: 17px; font-weight: 700; color: white; margin: 0 0 4px 0;">{name}</p>
+            <p style="font-size: 13px; color: rgba(255,255,255,0.85); margin: 0;">{description}</p>
+          </td>
+          <td style="width: 100px; vertical-align: middle; text-align: right;">
+            <span style="background: rgba(255,255,255,0.25); color: white; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; white-space: nowrap;">바로가기 →</span>
+          </td>
+        </tr>
+      </table>
+    </div>
+  </a>
 </div>
 '''
 
@@ -860,7 +879,7 @@ WRITING_PROMPT = """
 - <strong>: 강조
 
 🔖 이미지 태그:
-- [IMAGE_1], [IMAGE_2], [IMAGE_3], [IMAGE_4] 배치
+- [IMAGE_1], [IMAGE_2] 배치 (2개만)
 
 📌 마지막에 메타 설명 추가:
 [META]SEO 최적화된 메타 설명 (150자 이내)[/META]

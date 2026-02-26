@@ -20,7 +20,7 @@ STRUCTURE_TEMPLATES = {
             {"type": "heading", "title": "마무리"},
             {"type": "outro", "min_words": 150, "max_words": 300},
         ],
-        "image_count": [4, 5],
+        "image_count": [2, 2],
         "total_words": [2800, 4000],
     },
 
@@ -38,7 +38,7 @@ STRUCTURE_TEMPLATES = {
             {"type": "heading", "title": "마무리"},
             {"type": "outro", "min_words": 200, "max_words": 350},
         ],
-        "image_count": [4, 5],
+        "image_count": [2, 2],
         "total_words": [2900, 4200],
     },
 
@@ -55,7 +55,7 @@ STRUCTURE_TEMPLATES = {
             {"type": "table", "rows": [4, 6]},
             {"type": "outro", "min_words": 150, "max_words": 280},
         ],
-        "image_count": [4, 5],
+        "image_count": [2, 2],
         "total_words": [2600, 3800],
     },
 
@@ -75,7 +75,7 @@ STRUCTURE_TEMPLATES = {
             {"type": "heading", "title": "결론"},
             {"type": "outro", "min_words": 200, "max_words": 350},
         ],
-        "image_count": [4, 5],
+        "image_count": [2, 2],
         "total_words": [3000, 4300],
     },
 
@@ -91,7 +91,7 @@ STRUCTURE_TEMPLATES = {
             {"type": "heading", "title": "정리"},
             {"type": "outro", "min_words": 180, "max_words": 300},
         ],
-        "image_count": [4, 5],
+        "image_count": [2, 2],
         "total_words": [2700, 3900],
     },
 }

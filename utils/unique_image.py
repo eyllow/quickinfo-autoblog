@@ -102,28 +102,9 @@ def generate_unique_screenshot(keyword: str, overlay_text: str = None) -> str:
 
 def should_use_screenshot(keyword: str, category: str) -> bool:
     """
-    스크린샷 사용 여부 결정
-
-    Args:
-        keyword: 블로그 키워드
-        category: 카테고리명
-
-    Returns:
-        스크린샷을 사용해야 하면 True
+    스크린샷 사용 여부 결정 — 비활성화됨
+    (정부사이트 봇 차단으로 깨진 이미지 발생)
     """
-    # 키워드 매칭 확인 - 매칭되면 100% 사용
-    for kw in SCREENSHOT_KEYWORDS:
-        if kw in keyword:
-            logger.info(f"Screenshot enabled: keyword '{kw}' matched in '{keyword}'")
-            return True
-
-    # 카테고리 확인 - 50% 확률
-    if category in SCREENSHOT_CATEGORIES:
-        use_screenshot = random.random() > 0.5
-        if use_screenshot:
-            logger.info(f"Screenshot enabled: category '{category}' (50% probability)")
-        return use_screenshot
-
     return False
 
 

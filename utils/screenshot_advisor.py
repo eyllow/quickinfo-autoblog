@@ -15,21 +15,14 @@ logger = logging.getLogger(__name__)
 
 def get_screenshot_recommendation(keyword: str, category: str) -> dict:
     """
-    AI가 스크린샷 필요 여부와 URL을 동적으로 추천
-
-    Args:
-        keyword: 블로그 키워드
-        category: 카테고리명
-
-    Returns:
-        {
-            "need_screenshot": bool,
-            "reason": str,
-            "url": str or None,
-            "site_name": str or None,
-            "is_person": bool
-        }
+    스크린샷 필요 여부 판단 — 비활성화됨
+    (정부사이트 대부분 봇 차단으로 깨진 이미지 발생하여 항상 불필요 반환)
     """
+    logger.info(f"Screenshot disabled for '{keyword}' - always returning False")
+    print(f"  🚫 스크린샷 비활성화 (봇 차단 이슈)")
+    return {"need_screenshot": False, "reason": "스크린샷 기능 비활성화", "url": None, "site_name": None, "is_person": False}
+
+    # === 아래는 기존 코드 (비활성화) ===
     client = anthropic.Anthropic(api_key=settings.claude_api_key)
 
     prompt = f"""당신은 블로그 콘텐츠 전문가입니다.

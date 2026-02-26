@@ -75,9 +75,10 @@ def clean_html_styles(html_content: str) -> str:
     )
     html_content = html_content.replace('</blockquote>', '</div>')
 
-    # border-left 인라인 스타일 제거 (다양한 형태)
+    # border-left 인라인 스타일 제거 (강조 박스의 4px solid 색상은 유지)
+    # 강조 박스용 border-left (4px solid #색상)는 보존하고 나머지만 제거
     html_content = re.sub(
-        r'border-left:\s*[^;"]+;?',
+        r'border-left:\s*(?!4px\s+solid\s+#)[^;"]+;?',
         '',
         html_content,
         flags=re.IGNORECASE
@@ -690,7 +691,7 @@ class ContentGenerator:
         content: str,
         keyword: str,
         category_name: str,
-        count: int = 4,
+        count: int = 2,
         use_mixed: bool = True
     ) -> str:
         """
