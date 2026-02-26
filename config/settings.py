@@ -52,6 +52,13 @@ class Settings(BaseSettings):
     # 네이버 검색 URL
     naver_search_url: str = "https://search.naver.com/search.naver"
 
+    # AI Provider 설정 (gemini 또는 claude)
+    ai_provider: str = "gemini"
+
+    # Gemini 설정
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.0-flash"
+
     # Claude 모델
     claude_model: str = "claude-3-5-haiku-20241022"
 
@@ -62,6 +69,12 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         extra = "ignore"
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # GOOGLE_API_KEY 환경변수에서 gemini_api_key 로드
+        if not self.gemini_api_key:
+            self.gemini_api_key = os.getenv("GOOGLE_API_KEY", "")
 
 
 # 싱글톤 설정 인스턴스

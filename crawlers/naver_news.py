@@ -1,8 +1,9 @@
-"""네이버 뉴스 크롤러"""
+"""네이버 뉴스 + Google News RSS 크롤러"""
 import logging
 import time
 import re
-from typing import Optional
+import xml.etree.ElementTree as ET
+from typing import Optional, List
 from dataclasses import dataclass
 from urllib.parse import quote, urljoin
 
@@ -226,10 +227,159 @@ class NaverNewsCrawler:
         return "\n\n".join(summaries)
 
 
+class GoogleNewsCrawler:
+    """Google News RSS 한국어 크롤러"""
+
+    GOOGLE_NEWS_RSS = "https://news.google.com/rss/search?q={query}&hl=ko&gl=KR&ceid=KR:ko"
+
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update(HEADERS)
+
+    def search_news(self, keyword: str, max_articles: int = 5) -> List[NewsArticle]:
+        """Google News RSS에서 뉴스 검색"""
+        try:
+            url = self.GOOGLE_NEWS_RSS.format(query=quote(keyword))
+            response = self.session.get(url, timeout=10)
+            response.raise_for_status()
+
+            root = ET.fromstring(response.content)
+            articles = []
+
+            for item in root.findall('.//item'):
+                if len(articles) >= max_articles:
+                    break
+
+                title = item.findtext('title', '')
+                link = item.findtext('link', '')
+                pub_date = item.findtext('pubDate', '')
+                source = item.findtext('source', '')
+                description = item.findtext('description', '')
+
+                # HTML 태그 제거
+                if description:
+                    description = re.sub(r'<[^>]+>', '', description).strip()
+
+                articles.append(NewsArticle(
+                    title=title,
+                    link=link,
+                    summary=description or title,
+                    source=source,
+                    date=pub_date,
+                ))
+
+            logger.info(f"Google News: {len(articles)} articles for '{keyword}'")
+            return articles
+
+        except Exception as e:
+            logger.error(f"Google News RSS error for '{keyword}': {e}")
+            return []
+
+    def get_news_summary(self, keyword: str, max_articles: int = 5) -> str:
+        """키워드 관련 Google News 요약"""
+        articles = self.search_news(keyword, max_articles)
+        if not articles:
+            return ""
+
+        summaries = []
+        for i, article in enumerate(articles, 1):
+            s = f"[Google뉴스 {i}] {article.title}"
+            if article.summary and article.summary != article.title:
+                s += f"\n{article.summary}"
+            if article.source:
+                s += f"\n출처: {article.source}"
+            summaries.append(s)
+
+        return "\n\n".join(summaries)
+
+
+def extract_key_facts(text: str) -> dict:
+    """
+    뉴스 본문에서 핵심 팩트 추출 (날짜, 수치, 인물, 기관)
+    """
+    facts = {
+        "dates": [],
+        "numbers": [],
+        "people": [],
+        "organizations": [],
+    }
+
+    # 날짜 패턴
+    date_patterns = [
+        r'\d{4}년\s*\d{1,2}월\s*\d{1,2}일',
+        r'\d{4}\.\d{1,2}\.\d{1,2}',
+        r'\d{1,2}월\s*\d{1,2}일',
+    ]
+    for p in date_patterns:
+        facts["dates"].extend(re.findall(p, text))
+
+    # 수치 패턴 (금액, 퍼센트 등)
+    number_patterns = [
+        r'\d+(?:,\d{3})*(?:\.\d+)?(?:원|만원|억원|조원)',
+        r'\d+(?:\.\d+)?%',
+        r'\d+(?:,\d{3})*명',
+        r'\d+(?:,\d{3})*건',
+    ]
+    for p in number_patterns:
+        facts["numbers"].extend(re.findall(p, text))
+
+    # 기관 패턴
+    org_patterns = [
+        r'[가-힣]+(?:부|처|청|원|위원회|은행|공사|공단|협회|연합회)',
+        r'[가-힣]+(?:대학교|대학|연구원|연구소)',
+    ]
+    for p in org_patterns:
+        found = re.findall(p, text)
+        facts["organizations"].extend([o for o in found if len(o) >= 3])
+
+    # 중복 제거
+    for key in facts:
+        facts[key] = list(set(facts[key]))[:10]
+
+    return facts
+
+
+class CombinedNewsCrawler:
+    """네이버 + Google News 통합 크롤러"""
+
+    def __init__(self):
+        self.naver = NaverNewsCrawler()
+        self.google = GoogleNewsCrawler()
+
+    def get_combined_summary(self, keyword: str, max_per_source: int = 3) -> str:
+        """두 소스에서 뉴스 수집 후 통합 요약"""
+        naver_summary = self.naver.get_news_summary(keyword, max_per_source)
+        google_summary = self.google.get_news_summary(keyword, max_per_source)
+
+        parts = []
+        if naver_summary:
+            parts.append(f"[네이버 뉴스]\n{naver_summary}")
+        if google_summary:
+            parts.append(f"[Google 뉴스]\n{google_summary}")
+
+        combined = "\n\n".join(parts) if parts else f"'{keyword}'에 대한 최신 뉴스를 찾을 수 없습니다."
+
+        # 핵심 팩트 추출
+        facts = extract_key_facts(combined)
+        if any(facts.values()):
+            fact_lines = []
+            if facts["dates"]:
+                fact_lines.append(f"주요 날짜: {', '.join(facts['dates'][:5])}")
+            if facts["numbers"]:
+                fact_lines.append(f"주요 수치: {', '.join(facts['numbers'][:5])}")
+            if facts["organizations"]:
+                fact_lines.append(f"관련 기관: {', '.join(facts['organizations'][:5])}")
+            if fact_lines:
+                combined += "\n\n[핵심 팩트 요약]\n" + "\n".join(fact_lines)
+
+        return combined
+
+
 if __name__ == "__main__":
     # 테스트
     logging.basicConfig(level=logging.INFO)
-    crawler = NaverNewsCrawler()
-    summary = crawler.get_news_summary("인공지능")
-    print("News Summary:")
+
+    combined = CombinedNewsCrawler()
+    summary = combined.get_combined_summary("인공지능")
+    print("Combined News Summary:")
     print(summary)

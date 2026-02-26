@@ -284,16 +284,28 @@ class ImageFetcher:
                     logger.debug(f"부적절한 이미지 제외: {alt_text[:50]}")
                     continue
 
+                # 최소 해상도 체크 (width >= 800)
+                width = photo.get("width", 0)
+                if width < 800:
+                    logger.debug(f"저해상도 이미지 제외: {width}px")
+                    continue
+
                 # 사용 기록에 추가
                 self._used_image_ids.add(photo_id)
+
+                # 주제 관련 설명 캡션 생성 (Pexels 출처 제거)
+                raw_alt = photo.get("alt", "")
+                caption_alt = raw_alt if raw_alt else keyword
 
                 images.append({
                     "id": photo_id,
                     "url": photo["src"]["large"],  # 큰 이미지
                     "thumbnail": photo["src"]["medium"],
-                    "alt": photo.get("alt", keyword),
+                    "alt": caption_alt,
                     "photographer": photo["photographer"],
                     "photographer_url": photo["photographer_url"],
+                    "width": width,
+                    "height": photo.get("height", 0),
                 })
 
                 if len(images) >= count:

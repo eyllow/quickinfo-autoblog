@@ -1,5 +1,6 @@
 """카테고리별 프롬프트 템플릿 - 고품질 블로그 글 생성용 (AdSense 최적화)"""
 import re
+import random
 from datetime import datetime
 
 # =============================================================================
@@ -71,7 +72,227 @@ CONTENT_CONSISTENCY_RULES = """
 """
 
 # =============================================================================
-# 공통 스타일 규칙 (AdSense 최적화)
+# 5가지 글 형식 (FORMAT) 정의
+# =============================================================================
+
+CONTENT_FORMATS = {
+    "info_guide": {
+        "name": "정보 가이드형",
+        "description": "단계별 넘버링 + 체크리스트 박스 + 핵심 요약 카드",
+        "structure_guide": """
+[글 형식: 정보 가이드형]
+- Step 1, Step 2... 단계별 넘버링으로 구성
+- 각 단계마다 ✅ 체크리스트 박스 HTML 포함
+- 섹션 끝마다 핵심 요약 카드(배경색 박스) 배치
+- 마지막에 전체 요약 체크리스트 제공
+""",
+    },
+    "news_analysis": {
+        "name": "뉴스 분석형",
+        "description": "리드 문단 + 5W1H 구조 + 타임라인 + 전문가 의견 인용",
+        "structure_guide": """
+[글 형식: 뉴스 분석형]
+- 첫 문단에 핵심 한 줄 리드 (굵게 강조)
+- 5W1H(누가, 언제, 어디서, 무엇을, 왜, 어떻게) 구조
+- 시간순 타임라인 HTML 포함 (세로 점선 + 날짜/이벤트)
+- "전문가는 ~라고 분석해요" 스타일 인용 박스 포함
+- 배경 → 현황 → 전망 순서로 전개
+""",
+    },
+    "comparison": {
+        "name": "비교 분석형",
+        "description": "VS 비교 표 + 장단점 카드 + 상황별 추천 + 별점",
+        "structure_guide": """
+[글 형식: 비교 분석형]
+- 핵심 비교 항목을 HTML 테이블로 정리 (A vs B)
+- 각 옵션별 장점(녹색)/단점(빨간색) 카드 박스 배치
+- "이런 분에게 추천" 상황별 가이드
+- ★ 별점 또는 점수 (예: 가성비 ★★★★☆)
+- 최종 추천 요약 박스
+""",
+    },
+    "experience": {
+        "name": "실전 경험형",
+        "description": "문제 상황 → 해결 과정 → 결과 공유 (스토리텔링)",
+        "structure_guide": """
+[글 형식: 실전 경험형]
+- 도입: 구체적인 문제 상황 제시 ("이런 상황, 겪어보셨나요?")
+- 중반: 해결 과정을 단계별 서술 (시행착오 포함)
+- 후반: 결과 공유 + 배운 점 정리
+- 핵심 포인트는 강조 박스로 분리
+- 독자 공감을 유도하는 질문형 문장 활용
+- 스토리텔링이지만 팩트 기반 (과장 금지)
+""",
+    },
+    "qa_deep": {
+        "name": "Q&A 심층형",
+        "description": "핵심 질문 중심 구성, 각 질문에 깊이 있는 답변",
+        "structure_guide": """
+[글 형식: Q&A 심층형]
+- 도입에서 "많은 분들이 궁금해하는 핵심 질문" 안내
+- 각 Q는 <strong>Q. 질문</strong> 형식으로 소제목 대신 사용
+- 각 A는 최소 300자 이상의 상세 답변
+- 답변 안에 표, 리스트, 강조 박스 등 다양한 요소 혼합
+- 최소 7개 이상의 Q&A로 구성
+- 마지막에 "보너스 Q&A" 추가
+""",
+    },
+}
+
+# 카테고리별 추천 형식 매핑
+CATEGORY_FORMAT_MAP = {
+    "finance": ["info_guide", "qa_deep", "news_analysis"],
+    "product": ["comparison", "experience", "info_guide"],
+    "celebrity": ["news_analysis", "qa_deep", "experience"],
+    "health": ["info_guide", "qa_deep", "experience"],
+    "lifestyle": ["info_guide", "experience", "qa_deep"],
+    "education": ["info_guide", "qa_deep", "comparison"],
+    "trend": ["news_analysis", "qa_deep", "comparison"],
+}
+
+def select_content_format(category_template: str = "trend") -> dict:
+    """카테고리에 맞는 글 형식 랜덤 선택"""
+    preferred = CATEGORY_FORMAT_MAP.get(category_template, list(CONTENT_FORMATS.keys()))
+    format_key = random.choice(preferred)
+    return {**CONTENT_FORMATS[format_key], "key": format_key}
+
+
+# =============================================================================
+# 5가지 소제목 HTML 스타일
+# =============================================================================
+
+HEADING_STYLES = {
+    "gradient_bar": {
+        "name": "배경색 그라디언트 바",
+        "html": '''<div style="background: linear-gradient(135deg, {color1}, {color2}); padding: 12px 18px; border-radius: 6px; margin: 30px 0 15px 0;">
+  <h4 style="font-size: 20px; font-weight: 600; color: #fff; margin: 0;">{title}</h4>
+</div>''',
+        "colors": [
+            ("#2563eb", "#1d4ed8"),
+            ("#059669", "#047857"),
+            ("#7c3aed", "#6d28d9"),
+            ("#dc2626", "#b91c1c"),
+            ("#d97706", "#b45309"),
+        ]
+    },
+    "icon_text": {
+        "name": "좌측 아이콘 + 텍스트",
+        "html": '''<div style="display: flex; align-items: center; gap: 10px; margin: 30px 0 15px 0;">
+  <span style="font-size: 24px;">{icon}</span>
+  <h4 style="font-size: 20px; font-weight: 600; color: #333; margin: 0;">{title}</h4>
+</div>''',
+        "icons": ["📌", "💡", "📋", "🔍", "📊", "🎯", "⚡", "🔑", "📝", "🏷️"]
+    },
+    "underline": {
+        "name": "밑줄 강조",
+        "html": '''<h4 style="font-size: 20px; font-weight: 600; color: #333; margin: 30px 0 15px 0; padding-bottom: 8px; border-bottom: 3px solid {color};">{title}</h4>''',
+        "colors": ["#2563eb", "#059669", "#7c3aed", "#dc2626", "#d97706"]
+    },
+    "number_badge": {
+        "name": "번호 원형 배지",
+        "html": '''<div style="display: flex; align-items: center; gap: 12px; margin: 30px 0 15px 0;">
+  <span style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: {color}; color: #fff; border-radius: 50%; font-weight: 700; font-size: 15px;">{number}</span>
+  <h4 style="font-size: 20px; font-weight: 600; color: #333; margin: 0;">{title}</h4>
+</div>''',
+        "colors": ["#2563eb", "#059669", "#7c3aed", "#dc2626", "#d97706"]
+    },
+    "card_box": {
+        "name": "카드형 박스 소제목",
+        "html": '''<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px; margin: 30px 0 15px 0;">
+  <h4 style="font-size: 20px; font-weight: 600; color: #1e293b; margin: 0;">{title}</h4>
+</div>''',
+    },
+}
+
+def get_heading_style_instruction() -> tuple:
+    """랜덤 소제목 스타일 선택 후 (style_key, 프롬프트 지시) 반환"""
+    style_key = random.choice(list(HEADING_STYLES.keys()))
+    style = HEADING_STYLES[style_key]
+
+    if style_key == "gradient_bar":
+        c1, c2 = random.choice(style["colors"])
+        instruction = f"""소제목 HTML은 배경 그라디언트 바 스타일을 사용하세요:
+<div style="background: linear-gradient(135deg, {c1}, {c2}); padding: 12px 18px; border-radius: 6px; margin: 30px 0 15px 0;">
+  <h4 style="font-size: 20px; font-weight: 600; color: #fff; margin: 0;">소제목 텍스트</h4>
+</div>"""
+    elif style_key == "icon_text":
+        instruction = f"""소제목 HTML은 좌측 아이콘 + 텍스트 스타일을 사용하세요. 아이콘은 {', '.join(style['icons'][:5])} 중 적절한 것을 선택:
+<div style="display: flex; align-items: center; gap: 10px; margin: 30px 0 15px 0;">
+  <span style="font-size: 24px;">📌</span>
+  <h4 style="font-size: 20px; font-weight: 600; color: #333; margin: 0;">소제목 텍스트</h4>
+</div>"""
+    elif style_key == "underline":
+        color = random.choice(style["colors"])
+        instruction = f"""소제목 HTML은 밑줄 강조 스타일을 사용하세요:
+<h4 style="font-size: 20px; font-weight: 600; color: #333; margin: 30px 0 15px 0; padding-bottom: 8px; border-bottom: 3px solid {color};">소제목 텍스트</h4>"""
+    elif style_key == "number_badge":
+        color = random.choice(style["colors"])
+        instruction = f"""소제목 HTML은 번호 원형 배지 스타일을 사용하세요 (번호를 1, 2, 3... 순서대로):
+<div style="display: flex; align-items: center; gap: 12px; margin: 30px 0 15px 0;">
+  <span style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: {color}; color: #fff; border-radius: 50%; font-weight: 700; font-size: 15px;">1</span>
+  <h4 style="font-size: 20px; font-weight: 600; color: #333; margin: 0;">소제목 텍스트</h4>
+</div>"""
+    else:  # card_box
+        instruction = """소제목 HTML은 카드형 박스 스타일을 사용하세요:
+<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px; margin: 30px 0 15px 0;">
+  <h4 style="font-size: 20px; font-weight: 600; color: #1e293b; margin: 0;">소제목 텍스트</h4>
+</div>"""
+
+    return style_key, instruction
+
+
+# =============================================================================
+# 강조 박스 4종
+# =============================================================================
+
+HIGHLIGHT_BOXES = {
+    "info": '''<div style="margin: 20px 0; padding: 18px; background: #eff6ff; border-left: 4px solid #2563eb; border-radius: 6px;">
+  <p style="margin: 0; color: #1e40af; font-size: 15px;"><strong>ℹ️ 참고</strong></p>
+  <p style="margin: 8px 0 0 0; color: #1e3a5f; font-size: 15px; line-height: 1.7;">{content}</p>
+</div>''',
+    "warning": '''<div style="margin: 20px 0; padding: 18px; background: #fffbeb; border-left: 4px solid #d97706; border-radius: 6px;">
+  <p style="margin: 0; color: #92400e; font-size: 15px;"><strong>⚠️ 주의</strong></p>
+  <p style="margin: 8px 0 0 0; color: #78350f; font-size: 15px; line-height: 1.7;">{content}</p>
+</div>''',
+    "success": '''<div style="margin: 20px 0; padding: 18px; background: #ecfdf5; border-left: 4px solid #059669; border-radius: 6px;">
+  <p style="margin: 0; color: #065f46; font-size: 15px;"><strong>💡 팁</strong></p>
+  <p style="margin: 8px 0 0 0; color: #064e3b; font-size: 15px; line-height: 1.7;">{content}</p>
+</div>''',
+    "quote": '''<div style="margin: 20px 0; padding: 18px; background: #f9fafb; border-left: 4px solid #6b7280; border-radius: 6px;">
+  <p style="margin: 0; color: #374151; font-size: 15px; font-style: italic; line-height: 1.7;">"{content}"</p>
+</div>''',
+}
+
+HIGHLIGHT_BOX_INSTRUCTION = """
+[강조 박스 사용법 - 4가지 종류를 골고루 사용하세요]
+
+1. 정보 박스 (파란색):
+<div style="margin: 20px 0; padding: 18px; background: #eff6ff; border-left: 4px solid #2563eb; border-radius: 6px;">
+  <p style="margin: 0; color: #1e40af; font-size: 15px;"><strong>ℹ️ 참고</strong></p>
+  <p style="margin: 8px 0 0 0; color: #1e3a5f; font-size: 15px; line-height: 1.7;">내용</p>
+</div>
+
+2. 주의 박스 (노란색):
+<div style="margin: 20px 0; padding: 18px; background: #fffbeb; border-left: 4px solid #d97706; border-radius: 6px;">
+  <p style="margin: 0; color: #92400e; font-size: 15px;"><strong>⚠️ 주의</strong></p>
+  <p style="margin: 8px 0 0 0; color: #78350f; font-size: 15px; line-height: 1.7;">내용</p>
+</div>
+
+3. 팁 박스 (녹색):
+<div style="margin: 20px 0; padding: 18px; background: #ecfdf5; border-left: 4px solid #059669; border-radius: 6px;">
+  <p style="margin: 0; color: #065f46; font-size: 15px;"><strong>💡 팁</strong></p>
+  <p style="margin: 8px 0 0 0; color: #064e3b; font-size: 15px; line-height: 1.7;">내용</p>
+</div>
+
+4. 인용 박스 (회색):
+<div style="margin: 20px 0; padding: 18px; background: #f9fafb; border-left: 4px solid #6b7280; border-radius: 6px;">
+  <p style="margin: 0; color: #374151; font-size: 15px; font-style: italic; line-height: 1.7;">"인용 내용"</p>
+</div>
+"""
+
+
+# =============================================================================
+# 공통 스타일 규칙 (AdSense 최적화) - 개선
 # =============================================================================
 
 COMMON_STYLE = """
@@ -84,7 +305,8 @@ COMMON_STYLE = """
 [AdSense 승인을 위한 필수 규칙]
 
 1. 콘텐츠 품질
-   - 최소 3,000자 이상의 상세한 정보
+   - 최소 5,000자 이상의 상세한 정보 (약 2,000단어)
+   - 각 섹션별 최소 400자 이상
    - 독창적인 분석과 통찰 포함
    - 독자에게 실질적인 가치 제공
    - 정확한 정보와 신뢰할 수 있는 출처
@@ -106,8 +328,18 @@ COMMON_STYLE = """
    - 짧고 명확한 문장 (40자 이내)
    - 객관적 사실 중심 서술
 
+5. SEO 규칙
+   - 키워드를 제목, 첫 문단, 소제목(2개 이상), 본문에 자연스럽게 분산
+   - 첫 100자 안에 핵심 키워드 필수 포함
+   - 관련 LSI 키워드(유의어, 관련어) 자연스럽게 포함
+   - FAQ 섹션은 구조화 데이터 대비: <div class="faq-item"><strong>Q. 질문</strong><p>답변</p></div>
+
+{heading_style_instruction}
+
+{highlight_box_instruction}
+
 [정렬 규칙]
-* 중앙 정렬: 대제목, 카테고리 뱃지, 강조 박스, 이미지 캡션
+* 중앙 정렬: 대제목, 카테고리 뱃지, 이미지 캡션
 * 왼쪽 정렬: 소제목, 본문, 리스트, 표, FAQ
 
 [HTML 형식]
@@ -117,13 +349,6 @@ COMMON_STYLE = """
 <h2 style="font-size: 26px; font-weight: 700; color: #222; margin: 0 0 25px 0; line-height: 1.4; text-align: center;">
   대제목 내용
 </h2>
-
-- 소제목 (세로바 스타일, 왼쪽 정렬):
-<div style="border-left: 3px solid #333; padding-left: 12px; margin: 30px 0 15px 0; text-align: left;">
-  <h4 style="font-size: 20px; font-weight: 600; color: #333; margin: 0;">
-    소제목 내용
-  </h4>
-</div>
 
 - 본문 텍스트 (왼쪽 정렬):
 <p style="font-size: 16px; line-height: 2.0; color: #444; margin: 12px 0; text-align: left;">
@@ -135,11 +360,6 @@ COMMON_STYLE = """
   <li style="margin: 8px 0;">항목 1</li>
   <li style="margin: 8px 0;">항목 2</li>
 </ul>
-
-- 강조 박스 (중앙 정렬):
-<div style="margin: 30px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; font-size: 18px; font-weight: 500; color: #2e8b57; text-align: center;">
-  핵심 내용 강조
-</div>
 
 - 테이블 스타일:
 <table style="width: 100%; max-width: 600px; margin: 25px 0; border-collapse: collapse; font-size: 15px; text-align: left;">
@@ -156,12 +376,6 @@ COMMON_STYLE = """
     </tr>
   </tbody>
 </table>
-
-- FAQ:
-<div style="text-align: left; margin: 20px 0;">
-  <p><strong>Q. 질문?</strong></p>
-  <p>A. 답변</p>
-</div>
 
 - 사진 캡션 (중앙 정렬):
 <p style="font-size: 13px; color: #888; margin: 8px 0 25px 0; text-align: center;">
@@ -203,18 +417,9 @@ SYSTEM_PROMPT = """
 # =============================================================================
 
 def clean_ai_content(content: str) -> str:
-    """
-    AI 생성 콘텐츠에서 금지 표현 제거
-
-    Args:
-        content: 원본 콘텐츠
-
-    Returns:
-        정제된 콘텐츠
-    """
+    """AI 생성 콘텐츠에서 금지 표현 제거"""
     result = content
 
-    # 금지 표현 제거/대체
     replacements = {
         "ㅋㅋㅋ": "",
         "ㅋㅋ": "",
@@ -247,54 +452,37 @@ def clean_ai_content(content: str) -> str:
     for old, new in replacements.items():
         result = result.replace(old, new)
 
-    # 연속된 느낌표/물음표 정리
     result = re.sub(r'!{2,}', '!', result)
     result = re.sub(r'\?{2,}', '?', result)
-
-    # 연속된 공백 정리
     result = re.sub(r' {2,}', ' ', result)
 
     return result
 
 
 def limit_emojis(content: str, max_emojis: int = 2) -> str:
-    """
-    이모지 개수 제한
-
-    Args:
-        content: 원본 콘텐츠
-        max_emojis: 최대 이모지 개수 (기본 2개)
-
-    Returns:
-        이모지가 제한된 콘텐츠
-    """
-    # 이모지 패턴 (유니코드 이모지 범위)
+    """이모지 개수 제한"""
     emoji_pattern = re.compile(
         "["
-        "\U0001F600-\U0001F64F"  # 이모티콘
-        "\U0001F300-\U0001F5FF"  # 기호 및 픽토그램
-        "\U0001F680-\U0001F6FF"  # 교통 및 지도 기호
-        "\U0001F1E0-\U0001F1FF"  # 국기
-        "\U00002702-\U000027B0"  # 딩뱃
-        "\U0001F900-\U0001F9FF"  # 보충 기호
-        "\U0001FA00-\U0001FA6F"  # 체스 기호
-        "\U0001FA70-\U0001FAFF"  # 확장 기호
-        "\U00002600-\U000026FF"  # 기타 기호
-        "\U00002700-\U000027BF"  # 딩뱃 기호
+        "\U0001F600-\U0001F64F"
+        "\U0001F300-\U0001F5FF"
+        "\U0001F680-\U0001F6FF"
+        "\U0001F1E0-\U0001F1FF"
+        "\U00002702-\U000027B0"
+        "\U0001F900-\U0001F9FF"
+        "\U0001FA00-\U0001FA6F"
+        "\U0001FA70-\U0001FAFF"
+        "\U00002600-\U000026FF"
+        "\U00002700-\U000027BF"
         "]+",
         flags=re.UNICODE
     )
 
-    # 모든 이모지 찾기
     emojis = emoji_pattern.findall(content)
-
     if len(emojis) <= max_emojis:
         return content
 
-    # max_emojis 이후의 이모지 제거
     result = content
     emoji_count = 0
-
     for match in emoji_pattern.finditer(content):
         emoji_count += 1
         if emoji_count > max_emojis:
@@ -304,397 +492,150 @@ def limit_emojis(content: str, max_emojis: int = 2) -> str:
 
 
 def post_process_content(content: str) -> str:
-    """
-    콘텐츠 후처리 통합 함수
-
-    Args:
-        content: 원본 콘텐츠
-
-    Returns:
-        AdSense 최적화된 콘텐츠
-    """
+    """콘텐츠 후처리 통합 함수"""
     result = clean_ai_content(content)
     result = limit_emojis(result, max_emojis=2)
     return result
 
 
 # =============================================================================
-# 카테고리별 프롬프트 템플릿 (AdSense 최적화)
+# 카테고리별 프롬프트 템플릿 (개선 - 형식 다양화 포함)
 # =============================================================================
 
-FINANCE_TEMPLATE = """
-{common_style}
+def _build_common_style():
+    """소제목 스타일, 강조 박스 지시를 포함한 COMMON_STYLE 생성"""
+    _, heading_instruction = get_heading_style_instruction()
+    return COMMON_STYLE.format(
+        heading_style_instruction=heading_instruction,
+        highlight_box_instruction=HIGHLIGHT_BOX_INSTRUCTION,
+    )
+
+
+def _build_category_prompt(keyword: str, news_data: str, category: str, extra_sections: str, format_info: dict) -> str:
+    """카테고리 공통 프롬프트 빌더"""
+    common = _build_common_style()
+
+    return f"""{common}
+
+{format_info['structure_guide']}
 
 주제: '{keyword}'
-카테고리: 재테크/정보
+카테고리: {category}
 참고 데이터: {news_data}
 
-[필수 구성요소]
+[분량 기준]
+- 전체 최소 5,000자 (약 2,000단어)
+- 서론: 최소 400자
+- 각 본문 섹션: 최소 400자
+- FAQ: 최소 500자 (5개 이상)
+- 마무리: 최소 200자
 
-1. 서론 (300자)
-   - 해당 주제의 중요성 설명
-   - 현재 상황이나 관련 통계 제시
-   - 이 글에서 다룰 내용 안내
+{extra_sections}
 
-2. [IMAGE_1]
-
-3. <h2>│ {keyword}란? 📋</h2> (400자)
-   - 핵심 개념 정의
-   - 왜 알아야 하는지 이유 설명
-   - 관련 제도나 정책 배경
-
-4. [IMAGE_2]
-
-5. <h2>│ 주요 절차 및 방법</h2>
-   - HTML 테이블로 단계별 정리
-   - 필요 서류, 조건, 기한 명시
-   - 주의사항 포함
-
-6. [IMAGE_3]
-
-7. <h2>│ 알아두면 좋은 정보 💡</h2> (500자)
-   - 실제 적용 시 유용한 정보 5가지
-   - 번호 목록으로 명확하게 정리
-
-8. <h2>│ 자주 묻는 질문</h2> (400자)
-   - Q&A 형식 3-5개
-   - 실제 많이 검색되는 질문 중심
-
-9. [IMAGE_4]
-
-10. <h2>│ 마무리</h2> (200자)
-    - 핵심 내용 요약
-    - 다음 단계 안내
-
-11. [OFFICIAL_LINK]
-12. [COUPANG]
-13. [AFFILIATE_NOTICE]
-14. [META]SEO 메타 설명 150자 이내[/META]
+[필수 태그]
+- [IMAGE_1], [IMAGE_2], [IMAGE_3], [IMAGE_4] 배치
+- [OFFICIAL_LINK]: 공식 사이트 위치
+- [COUPANG]: 쿠팡 상품 위치
+- [AFFILIATE_NOTICE]: 제휴 안내
+- [META]SEO 메타 설명 150자 이내[/META]
 
 [금지사항]
 - 불확실한 수치/날짜 언급 금지
 - 과장된 표현 금지
 - 감탄사(ㅋㅋ, ㅎㅎ) 사용 금지
+- border-left 세로바 소제목 사용 금지 (위에 지정된 소제목 스타일만 사용)
 
 결과는 순수 HTML만 출력하세요.
 """
 
-PRODUCT_TEMPLATE = """
-{common_style}
 
-주제: '{keyword}'
-카테고리: IT/제품
-참고 데이터: {news_data}
-
-[필수 구성요소]
-
-1. 서론 (300자)
-   - 제품 출시 배경이나 시장 상황
-   - 주요 특징 간략 소개
-
-2. [IMAGE_1]
-
-3. <h2>│ 기본 정보 📱</h2> (300자)
-   - 출시일, 가격, 주요 사양
-   - 간단한 테이블로 정리
-
-4. <h2>│ 상세 스펙 비교</h2>
-   - HTML 테이블로 경쟁 제품과 비교
-   - 객관적인 수치 중심
-
-5. [IMAGE_2]
-
-6. <h2>│ 장점</h2> (400자)
-   - 구체적인 장점 3-5개
-   - 실사용 관점에서 설명
-
-7. <h2>│ 단점 및 아쉬운 점</h2> (300자)
-   - 객관적인 단점 2-3개
-   - 균형 잡힌 분석
-
-8. [IMAGE_3]
-
-9. <h2>│ 추천 대상</h2> (300자)
-   - 타겟 사용자 유형 3가지
-   - 어떤 용도에 적합한지
-
-10. <h2>│ 구매 전 확인사항</h2> (300자)
-    - 구매 시 고려할 점
-    - 구매처 및 가격 정보
-
-11. [IMAGE_4]
-
-12. <h2>│ 마무리</h2> (200자)
-    - 종합 평가
-
-13. [COUPANG]
-14. [AFFILIATE_NOTICE]
-15. [META]SEO 메타 설명 150자 이내[/META]
-
-[금지사항]
-- 확인되지 않은 스펙 금지
-- 과장된 표현 금지
-
-결과는 순수 HTML만 출력하세요.
+FINANCE_EXTRA = """
+[재테크/정보 카테고리 특화]
+- 핵심 개념 정의 + 왜 알아야 하는지
+- 주요 절차/방법을 테이블로 정리
+- 필요 서류, 조건, 기한 명시
+- 실전 적용 시 유용한 정보 5가지 이상
+- FAQ 5개 이상 (실제 많이 검색되는 질문)
 """
 
-CELEBRITY_TEMPLATE = """
-{common_style}
+PRODUCT_EXTRA = """
+[IT/제품 카테고리 특화]
+- 출시일, 가격, 주요 사양 테이블
+- 경쟁 제품과 상세 스펙 비교 테이블
+- 장점 3-5개 (실사용 관점)
+- 단점 2-3개 (객관적 분석)
+- 추천 대상 유형 3가지
+- 구매 전 확인사항
+"""
 
-주제: '{keyword}'
-카테고리: 연예/인물
-참고 데이터: {news_data}
-
-[중요 안내]
-- 인물 사진 사용 불가 (저작권/초상권)
-- 무대, 콘서트, 이벤트 분위기 이미지만 사용
+CELEBRITY_EXTRA = """
+[연예/인물 카테고리 특화]
+- 인물 사진 사용 불가 (저작권/초상권) → 무대, 콘서트, 이벤트 분위기 이미지만
 - 외모 묘사 최소화
-
-[필수 구성요소]
-
-1. 서론 (300자)
-   - 현재 화제가 된 이유
-   - 주요 활동 분야 소개
-
-2. [IMAGE_1] (무대/콘서트 분위기)
-
-3. <h2>│ 기본 프로필 📋</h2> (300자)
-   - 본명, 생년월일, 소속사, 데뷔
-   - 간단한 테이블로 정리
-
-4. <h2>│ 주요 활동</h2> (400자)
-   - 대표작/대표곡
-   - 수상 이력
-   - 주요 활동 연혁
-
-5. [IMAGE_2] (시상식/이벤트 분위기)
-
-6. <h2>│ 최근 소식</h2> (500자)
-   - 최근 활동 내용
-   - 관련 뉴스 요약
-
-7. <h2>│ 향후 활동 전망</h2> (300자)
-   - 예정된 활동
-   - 기대되는 점
-
-8. [IMAGE_3] (공연/이벤트 분위기)
-
-9. <h2>│ 마무리</h2> (200자)
-    - 요약 정리
-
-10. [IMAGE_4]
-11. [AFFILIATE_NOTICE]
-12. [META]SEO 메타 설명 150자 이내[/META]
-
-[금지사항]
-- 인물 사진 사용 금지
-- 루머/확인되지 않은 정보 금지
-- 사생활 관련 내용 금지
-- 외모 상세 묘사 금지
-
-결과는 순수 HTML만 출력하세요.
+- 기본 프로필 (본명, 생년월일, 소속사, 데뷔) 테이블
+- 대표작/수상 이력
+- 최근 소식 (뉴스 기반)
+- 향후 활동 전망
+- 루머/사생활 금지
 """
 
-HEALTH_TEMPLATE = """
-{common_style}
-
-주제: '{keyword}'
-카테고리: 건강/생활
-참고 데이터: {news_data}
-
-[필수 구성요소]
-
-1. 서론 (300자)
-   - 해당 건강 주제의 중요성
-   - 많은 분들이 관심 갖는 이유
-
-2. [IMAGE_1]
-
-3. <h2>│ 원인과 배경</h2> (400자)
-   - 주요 원인 3-5가지
-   - 전문 용어는 쉽게 풀어서 설명
-
-4. <h2>│ 개선 방법 가이드</h2>
-   - 테이블 또는 번호 목록으로 정리
-   - 단계별 실천 방법
-
-5. [IMAGE_2]
-
-6. <h2>│ 효과적인 방법 💡</h2> (400자)
-   - 실제 도움이 되는 방법들
-   - 구체적인 실천 팁
-
-7. <h2>│ 주의사항</h2> (300자)
-   - 피해야 할 것들
-   - 흔한 실수
-
-8. [IMAGE_3]
-
-9. <h2>│ 자주 묻는 질문</h2> (400자)
-   - Q&A 형식 3-5개
-
-10. <h2>│ 마무리</h2> (200자)
-    - 핵심 요약
-
-11. [IMAGE_4]
-12. [DISCLAIMER]
-13. [COUPANG]
-14. [AFFILIATE_NOTICE]
-15. [META]SEO 메타 설명 150자 이내[/META]
-
-[금지사항]
-- 의료 진단/처방 금지
-- 특정 약품 추천 금지
-- 과장된 효과 주장 금지
-
-결과는 순수 HTML만 출력하세요.
+HEALTH_EXTRA = """
+[건강/생활 카테고리 특화]
+- 원인과 배경 (전문 용어 쉽게 풀어서)
+- 단계별 개선 방법 가이드
+- 실제 도움이 되는 실천 팁
+- 주의사항/흔한 실수
+- FAQ 5개 이상
+- [DISCLAIMER] 건강 면책문구 포함
+- 의료 진단/처방/특정 약품 추천 금지
 """
 
-LIFESTYLE_TEMPLATE = """
-{common_style}
-
-주제: '{keyword}'
-카테고리: 생활정보
-참고 데이터: {news_data}
-
-[필수 구성요소]
-
-1. 서론 (300자)
-   - 해당 주제가 중요한 이유
-   - 일상에서의 관련성
-
-2. [IMAGE_1]
-
-3. <h2>│ {keyword}의 중요성</h2> (300자)
-   - 왜 알아야 하는지
-   - 모르면 생기는 불편함
-
-4. <h2>│ 실천 방법</h2> (500자)
-   - 바로 따라할 수 있는 방법
-   - 단계별 설명
-
-5. [IMAGE_2]
-
-6. <h2>│ 유용한 정보 💡</h2> (400자)
-   - 알아두면 좋은 팁 5가지
-   - 번호 목록으로 정리
-
-7. [IMAGE_3]
-
-8. <h2>│ 주의사항</h2> (300자)
-   - 피해야 할 실수들
-
-9. <h2>│ 자주 묻는 질문</h2> (300자)
-   - Q&A 3-5개
-
-10. <h2>│ 마무리</h2> (200자)
-    - 요약 정리
-
-11. [IMAGE_4]
-12. [COUPANG]
-13. [AFFILIATE_NOTICE]
-14. [META]SEO 메타 설명 150자 이내[/META]
-
-결과는 순수 HTML만 출력하세요.
+LIFESTYLE_EXTRA = """
+[생활정보 카테고리 특화]
+- 해당 주제의 중요성과 일상 관련성
+- 바로 따라할 수 있는 실천 방법
+- 유용한 정보 5가지 이상
+- 피해야 할 실수들
+- FAQ 5개 이상
 """
 
-EDUCATION_TEMPLATE = """
-{common_style}
-
-주제: '{keyword}'
-카테고리: 취업/교육
-참고 데이터: {news_data}
-
-[필수 구성요소]
-
-1. 서론 (300자)
-   - 해당 주제의 중요성
-   - 현재 취업/교육 시장 상황
-
-2. [IMAGE_1]
-
-3. <h2>│ 기본 정보 📋</h2> (400자)
-   - 핵심 개념 설명
-   - 관련 제도나 자격 안내
-
-4. <h2>│ 준비 방법 체크리스트</h2>
-   - 테이블로 단계별 정리
-   - 필요한 준비물, 기한 명시
-
-5. [IMAGE_2]
-
-6. <h2>│ 합격/성공을 위한 조언 💡</h2> (500자)
-   - 효과적인 준비 방법
-   - 경험자들의 조언
-
-7. <h2>│ 흔한 실수와 주의사항</h2> (300자)
-   - 피해야 할 것들
-
-8. [IMAGE_3]
-
-9. <h2>│ 자주 묻는 질문</h2> (400자)
-   - Q&A 3-5개
-
-10. <h2>│ 마무리</h2> (200자)
-    - 핵심 요약
-
-11. [IMAGE_4]
-12. [OFFICIAL_LINK]
-13. [AFFILIATE_NOTICE]
-14. [META]SEO 메타 설명 150자 이내[/META]
-
-결과는 순수 HTML만 출력하세요.
+EDUCATION_EXTRA = """
+[취업/교육 카테고리 특화]
+- 핵심 개념 + 관련 제도/자격 안내
+- 준비 방법 체크리스트 (테이블)
+- 합격/성공 조언
+- 흔한 실수와 주의사항
+- FAQ 5개 이상
 """
 
-TREND_TEMPLATE = """
-{common_style}
-
-주제: '{keyword}'
-카테고리: 트렌드/일반
-참고 데이터: {news_data}
-
-[필수 구성요소]
-
-1. 서론 (300자)
-   - 현재 화제가 된 배경
-   - 왜 주목받고 있는지
-
-2. [IMAGE_1]
-
-3. <h2>│ {keyword}란?</h2> (400자)
-   - 핵심 내용 설명
-   - 배경 정보
-
-4. <h2>│ 주목받는 이유</h2> (400자)
-   - 화제가 된 이유 분석
-   - 관련 이슈들
-
-5. [IMAGE_2]
-
-6. <h2>│ 핵심 포인트 정리 📌</h2> (400자)
-   - 알아야 할 것들
-   - 번호 목록으로 정리
-
-7. [IMAGE_3]
-
-8. <h2>│ 다양한 반응</h2> (300자)
-   - 여론/반응 정리
-   - 다양한 관점
-
-9. <h2>│ 향후 전망</h2> (300자)
-   - 예측과 분석
-   - 기대되는 점
-
-10. <h2>│ 마무리</h2> (200자)
-    - 요약 정리
-
-11. [IMAGE_4]
-12. [COUPANG]
-13. [AFFILIATE_NOTICE]
-14. [META]SEO 메타 설명 150자 이내[/META]
-
-결과는 순수 HTML만 출력하세요.
+TREND_EXTRA = """
+[트렌드/일반 카테고리 특화]
+- 현재 화제가 된 배경과 이유
+- 핵심 포인트 정리
+- 다양한 반응/여론
+- 향후 전망과 분석
 """
+
+CATEGORY_EXTRA_MAP = {
+    "finance": ("재테크/정보", FINANCE_EXTRA),
+    "product": ("IT/제품", PRODUCT_EXTRA),
+    "celebrity": ("연예/인물", CELEBRITY_EXTRA),
+    "health": ("건강/생활", HEALTH_EXTRA),
+    "lifestyle": ("생활정보", LIFESTYLE_EXTRA),
+    "education": ("취업/교육", EDUCATION_EXTRA),
+    "trend": ("트렌드/일반", TREND_EXTRA),
+}
+
+
+# 레거시 호환용 변수들
+FINANCE_TEMPLATE = "legacy"
+PRODUCT_TEMPLATE = "legacy"
+CELEBRITY_TEMPLATE = "legacy"
+HEALTH_TEMPLATE = "legacy"
+LIFESTYLE_TEMPLATE = "legacy"
+EDUCATION_TEMPLATE = "legacy"
+TREND_TEMPLATE = "legacy"
+
 
 # =============================================================================
 # 에버그린 콘텐츠 전용 템플릿 (AdSense 최적화)
@@ -704,9 +645,12 @@ def get_evergreen_template():
     """현재 날짜를 포함한 에버그린 템플릿 반환"""
     current_year = datetime.now().year
     current_month = datetime.now().month
+    common = _build_common_style()
+    format_info = select_content_format("lifestyle")
 
-    return f"""
-{{common_style}}
+    return f"""{common}
+
+{format_info['structure_guide']}
 
 당신은 7년 경력의 전문 에디터입니다.
 독자가 실제로 도움받을 수 있는 상세하고 정확한 정보를 제공하세요.
@@ -719,6 +663,11 @@ def get_evergreen_template():
 3. 명확한 구조: 논리적 흐름과 단계별 안내
 4. 객관적 서술: 과장 없이 사실 중심으로 작성
 
+[분량 기준]
+- 전체 최소 6,000자 (약 2,500단어)
+- 각 섹션 최소 500자
+- FAQ 최소 600자 (5개 이상, 각 답변 100자 이상)
+
 [품질 기준]
 
 1. 도입부
@@ -730,16 +679,17 @@ def get_evergreen_template():
    - "방법" 주제 → 단계별 가이드
    - "비교" 주제 → 장단점 분석 표
    - "신청/절차" 주제 → 순서도 + 필요 서류
-   - 각 섹션은 소제목(세로바 │) + 상세 설명
+   - 각 섹션별 강조 박스(정보/주의/팁/인용) 최소 1개 포함
 
 3. 실용적 정보
    - 표(테이블)로 정리할 수 있는 정보는 반드시 표로
    - 구체적인 금액, 기한, 조건 명시
    - 공식 사이트/기관 안내
 
-4. FAQ (3~5개)
+4. FAQ (5~7개)
    - 실제로 많이 검색하는 질문
-   - 상세한 답변
+   - 상세한 답변 (각 100자 이상)
+   - <div class="faq-item"> 래핑
 
 5. 마무리
    - 핵심 요약 2~3줄
@@ -749,17 +699,9 @@ def get_evergreen_template():
 카테고리: 에버그린 정보성 콘텐츠
 참고 데이터: {{news_data}}
 
-[작성 규칙]
-- 최소 4,000자 이상
-- {current_year}년 기준으로 작성
-- 소제목은 세로바(│) 스타일
-- 이모지는 소제목에 최대 1개씩만 (전체 2개 이하)
-- 본문에 이모지 사용 금지
-- 구체적인 수치/비율/예시 필수
-
 [연도 표기 규칙]
 - 현재 연도: {current_year}년
-- 과거 연도 언급 금지 (2024년, 2023년 등)
+- 과거 연도 언급 금지
 - "현재 기준", "최신 기준" 등 상대적 표현 권장
 
 [이미지 태그 배치]
@@ -769,17 +711,14 @@ def get_evergreen_template():
 - [IMAGE_4]: 마무리 전
 
 [필수 태그]
-- [OFFICIAL_LINK]: 공식 사이트 버튼 위치
-- [COUPANG]: 쿠팡 상품 위치 (필요시)
-- [AFFILIATE_NOTICE]: 제휴 안내 (필요시)
-- [META]SEO 메타 설명 150자[/META]: 글 맨 끝
+- [OFFICIAL_LINK], [COUPANG], [AFFILIATE_NOTICE]
+- [META]SEO 메타 설명 150자[/META]
 
 [금지 표현]
-- 감탄사: ㅋㅋ, ㅎㅎ, 헐, 대박
-- 과장: 완전, 진짜진짜, 무조건, 핵심 중의 핵심
-- 클릭베이트: 충격, 경악, 미친
-- 꿀팁, 핵꿀팁 → "효과적인 방법", "유용한 정보"로 대체
+- 감탄사, 과장, 클릭베이트
+- 꿀팁 → "효과적인 방법"
 - 메타 표현: "제공해주신", "작성하겠습니다"
+- border-left 세로바 소제목 사용 금지
 
 결과는 순수 HTML만 출력하세요.
 """
@@ -787,10 +726,10 @@ def get_evergreen_template():
 # 레거시 호환용 변수
 EVERGREEN_STYLE = ""
 EVERGREEN_TEMPLATE = None
-HUMAN_PERSONA_PROMPT = ""  # 더 이상 사용하지 않음 (레거시 호환)
+HUMAN_PERSONA_PROMPT = ""
 
 # =============================================================================
-# 템플릿 매핑
+# 템플릿 매핑 (레거시 호환)
 # =============================================================================
 
 CATEGORY_TEMPLATES = {
@@ -803,24 +742,25 @@ CATEGORY_TEMPLATES = {
     "trend": TREND_TEMPLATE,
 }
 
-def get_template(template_name: str, is_evergreen: bool = False) -> str:
+def get_template(template_name: str, is_evergreen: bool = False, keyword: str = "", news_data: str = "") -> str:
     """
-    템플릿 이름으로 프롬프트 반환
-
-    Args:
-        template_name: 템플릿 이름
-        is_evergreen: 에버그린 콘텐츠 여부
-
-    Returns:
-        완성된 프롬프트 템플릿
+    템플릿 이름으로 프롬프트 반환 (개선 버전 - 형식 다양화 + 소제목 스타일 다양화)
     """
     if is_evergreen:
         template = get_evergreen_template()
-        template = template.replace("{common_style}", COMMON_STYLE)
         return template
 
-    template = CATEGORY_TEMPLATES.get(template_name, TREND_TEMPLATE)
-    return template.replace("{common_style}", COMMON_STYLE)
+    # 카테고리별 형식 선택
+    format_info = select_content_format(template_name)
+    cat_label, extra = CATEGORY_EXTRA_MAP.get(template_name, ("트렌드/일반", TREND_EXTRA))
+
+    return _build_category_prompt(
+        keyword=keyword or "{keyword}",
+        news_data=news_data or "{news_data}",
+        category=cat_label,
+        extra_sections=extra,
+        format_info=format_info,
+    )
 
 # =============================================================================
 # 특수 요소 템플릿
@@ -883,13 +823,14 @@ STRUCTURE_PROMPT = """
 
 블로그 포스팅의 상세 목차를 구성해주세요.
 
-목차 구조 (총 2,500자 이상 분량):
-1. 서론 (300자) - 주제 소개, 중요성 설명
-2. 핵심 정보 (500자) - 정의, 개념, 왜 중요한지
-3. 상세 가이드 (600자) - 단계별 방법, 구체적 절차
-4. 실전 팁 (500자) - 유용한 정보 5가지, 주의사항
-5. FAQ (400자) - 자주 묻는 질문 3개
-6. 결론 (200자) - 핵심 요약
+목차 구조 (총 5,000자 이상 분량):
+1. 서론 (400자) - 주제 소개, 중요성 설명
+2. 핵심 정보 (600자) - 정의, 개념, 왜 중요한지
+3. 상세 가이드 (800자) - 단계별 방법, 구체적 절차
+4. 실전 팁 (700자) - 유용한 정보 5가지, 주의사항
+5. 비교/분석 (600자) - 관련 옵션 비교, 장단점
+6. FAQ (600자) - 자주 묻는 질문 5개 이상
+7. 결론 (300자) - 핵심 요약
 
 각 섹션의 소제목과 핵심 포인트를 JSON으로 출력하세요.
 """
@@ -902,7 +843,7 @@ WRITING_PROMPT = """
 아래 규칙을 지켜서 블로그 글을 작성해주세요:
 
 📝 분량 규칙:
-- 총 2,500자 이상
+- 총 5,000자 이상
 
 🎯 SEO 규칙:
 - '{keyword}' 키워드를 본문에 7~10회 자연스럽게 포함

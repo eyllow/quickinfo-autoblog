@@ -9,6 +9,12 @@ from pathlib import Path
 
 import anthropic
 
+try:
+    import google.generativeai as genai
+    HAS_GEMINI = True
+except ImportError:
+    HAS_GEMINI = False
+
 # AI 메타 응답 제거 패턴
 AI_META_PATTERNS = [
     r"^.*?제공해주신.*?작성하겠습니다\.?\s*",
@@ -241,8 +247,25 @@ class ContentGenerator:
     """Claude AI를 사용한 카테고리별 고품질 콘텐츠 생성기"""
 
     def __init__(self):
+        self.ai_provider = settings.ai_provider.lower()
         self.client = anthropic.Anthropic(api_key=settings.claude_api_key)
         self.model = settings.claude_model
+
+        # Gemini 초기화
+        if self.ai_provider == "gemini" and HAS_GEMINI:
+            if settings.gemini_api_key:
+                genai.configure(api_key=settings.gemini_api_key)
+                self.gemini_model = genai.GenerativeModel(settings.gemini_model)
+                logger.info(f"AI Provider: Gemini ({settings.gemini_model})")
+            else:
+                logger.warning("Gemini selected but GOOGLE_API_KEY not set, falling back to Claude")
+                self.ai_provider = "claude"
+        elif self.ai_provider == "gemini" and not HAS_GEMINI:
+            logger.warning("google-generativeai not installed, falling back to Claude")
+            self.ai_provider = "claude"
+
+        if self.ai_provider == "claude":
+            logger.info(f"AI Provider: Claude ({self.model})")
         self.coupang_id = settings.coupang_partner_id
         self.image_fetcher = ImageFetcher()
         self.web_searcher = GoogleSearcher()
@@ -361,6 +384,45 @@ class ContentGenerator:
             logger.error(f"Error calling Claude: {e}")
             raise
 
+    def _call_gemini(
+        self,
+        user_prompt: str,
+        system_prompt: str = SYSTEM_PROMPT,
+        max_tokens: int = 8000,
+        use_persona: bool = True
+    ) -> str:
+        """Gemini API 호출"""
+        try:
+            if use_persona:
+                full_prompt = PROFESSIONAL_PERSONA + "\n\n" + system_prompt + "\n\n" + user_prompt
+            else:
+                full_prompt = system_prompt + "\n\n" + user_prompt
+
+            response = self.gemini_model.generate_content(
+                full_prompt,
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=max_tokens,
+                    temperature=0.7,
+                )
+            )
+            return response.text
+
+        except Exception as e:
+            logger.error(f"Gemini API error: {e}")
+            raise
+
+    def _call_ai(
+        self,
+        user_prompt: str,
+        system_prompt: str = SYSTEM_PROMPT,
+        max_tokens: int = 8000,
+        use_persona: bool = True
+    ) -> str:
+        """통합 AI 호출 - ai_provider 설정에 따라 Claude/Gemini 선택"""
+        if self.ai_provider == "gemini":
+            return self._call_gemini(user_prompt, system_prompt, max_tokens, use_persona)
+        return self._call_claude(user_prompt, system_prompt, max_tokens, use_persona)
+
     def classify_category(self, keyword: str) -> tuple[str, dict]:
         """
         키워드 기반 카테고리 자동 분류
@@ -415,7 +477,7 @@ class ContentGenerator:
             prompt = get_title_prompt(keyword)
 
         # 제목 생성에는 페르소나 미사용
-        title = self._call_claude(prompt, max_tokens=200, use_persona=False)
+        title = self._call_ai(prompt, max_tokens=200, use_persona=False)
         return title.strip().strip('"\'')
 
     def perform_web_search(self, keyword: str) -> dict:
@@ -522,7 +584,7 @@ class ContentGenerator:
         # 모델 제한 내에서 최대치 사용 (Haiku: 8192)
         max_tokens = 8000
 
-        content = self._call_claude(prompt, max_tokens=max_tokens)
+        content = self._call_ai(prompt, max_tokens=max_tokens)
 
         # HTML 코드 블록 제거
         content = re.sub(r'^```html\s*', '', content, flags=re.MULTILINE)
@@ -657,11 +719,8 @@ class ContentGenerator:
                 logger.warning(f"Invalid image URL for {tag}: {img_data.get('url')}")
                 continue
 
-            # 스크린샷인 경우 다른 캡션 사용
-            if img_data.get('type') == 'screenshot':
-                caption = f"{img_data['alt']}"
-            else:
-                caption = f"{img_data['alt']} (Photo by {img_data['photographer']} on Pexels)"
+            # 캡션: 주제 관련 설명 (Pexels 출처 제거)
+            caption = img_data.get('alt', keyword)
 
             img_html = f'''
 <figure style="text-align: center; margin: 30px 0;">
