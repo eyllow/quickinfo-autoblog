@@ -163,80 +163,48 @@ def select_content_format(category_template: str = "trend") -> dict:
 
 HEADING_STYLES = {
     "gradient_bar": {
-        "name": "배경색 그라디언트 바",
-        "html": '''<div style="background: linear-gradient(135deg, {color1}, {color2}); padding: 12px 18px; border-radius: 6px; margin: 30px 0 15px 0;">
-  <h4 style="font-size: 20px; font-weight: 600; color: #fff; margin: 0;">{title}</h4>
-</div>''',
-        "colors": [
-            ("#2563eb", "#1d4ed8"),
-            ("#059669", "#047857"),
-            ("#7c3aed", "#6d28d9"),
-            ("#dc2626", "#b91c1c"),
-            ("#d97706", "#b45309"),
-        ]
-    },
-    "icon_text": {
-        "name": "좌측 아이콘 + 텍스트",
-        "html": '''<div style="display: flex; align-items: center; gap: 10px; margin: 30px 0 15px 0;">
-  <span style="font-size: 24px;">{icon}</span>
-  <h4 style="font-size: 20px; font-weight: 600; color: #333; margin: 0;">{title}</h4>
-</div>''',
-        "icons": ["📌", "💡", "📋", "🔍", "📊", "🎯", "⚡", "🔑", "📝", "🏷️"]
+        "name": "그라디언트 바",
     },
     "underline": {
         "name": "밑줄 강조",
-        "html": '''<h4 style="font-size: 20px; font-weight: 600; color: #333; margin: 30px 0 15px 0; padding-bottom: 8px; border-bottom: 3px solid {color};">{title}</h4>''',
-        "colors": ["#2563eb", "#059669", "#7c3aed", "#dc2626", "#d97706"]
     },
     "number_badge": {
-        "name": "번호 원형 배지",
-        "html": '''<div style="display: flex; align-items: center; gap: 12px; margin: 30px 0 15px 0;">
-  <span style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: {color}; color: #fff; border-radius: 50%; font-weight: 700; font-size: 15px;">{number}</span>
-  <h4 style="font-size: 20px; font-weight: 600; color: #333; margin: 0;">{title}</h4>
-</div>''',
-        "colors": ["#2563eb", "#059669", "#7c3aed", "#dc2626", "#d97706"]
+        "name": "번호 배지",
     },
     "card_box": {
-        "name": "카드형 박스 소제목",
-        "html": '''<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px; margin: 30px 0 15px 0;">
-  <h4 style="font-size: 20px; font-weight: 600; color: #1e293b; margin: 0;">{title}</h4>
-</div>''',
+        "name": "카드형",
+    },
+    "simple_bold": {
+        "name": "심플 굵은",
     },
 }
 
 def get_heading_style_instruction() -> tuple:
     """랜덤 소제목 스타일 선택 후 (style_key, 프롬프트 지시) 반환"""
     style_key = random.choice(list(HEADING_STYLES.keys()))
-    style = HEADING_STYLES[style_key]
 
     if style_key == "gradient_bar":
-        c1, c2 = random.choice(style["colors"])
-        instruction = f"""소제목 HTML은 배경 그라디언트 바 스타일을 사용하세요:
-<div style="background: linear-gradient(135deg, {c1}, {c2}); padding: 12px 18px; border-radius: 6px; margin: 30px 0 15px 0;">
-  <h4 style="font-size: 20px; font-weight: 600; color: #fff; margin: 0;">소제목 텍스트</h4>
-</div>"""
-    elif style_key == "icon_text":
-        instruction = f"""소제목 HTML은 좌측 아이콘 + 텍스트 스타일을 사용하세요. 아이콘은 {', '.join(style['icons'][:5])} 중 적절한 것을 선택:
-<div style="display: flex; align-items: center; gap: 10px; margin: 30px 0 15px 0;">
-  <span style="font-size: 24px;">📌</span>
-  <h4 style="font-size: 20px; font-weight: 600; color: #333; margin: 0;">소제목 텍스트</h4>
+        instruction = """소제목은 반드시 아래 HTML 형식을 사용하세요 (그라디언트 바 스타일):
+<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 12px 20px; border-radius: 8px; margin: 35px 0 15px 0;">
+  <h3 style="color: white; font-size: 19px; font-weight: 700; margin: 0;">소제목</h3>
 </div>"""
     elif style_key == "underline":
-        color = random.choice(style["colors"])
-        instruction = f"""소제목 HTML은 밑줄 강조 스타일을 사용하세요:
-<h4 style="font-size: 20px; font-weight: 600; color: #333; margin: 30px 0 15px 0; padding-bottom: 8px; border-bottom: 3px solid {color};">소제목 텍스트</h4>"""
+        instruction = """소제목은 반드시 아래 HTML 형식을 사용하세요 (밑줄 강조 스타일):
+<h3 style="font-size: 20px; font-weight: 700; color: #1a1a1a; padding-bottom: 10px; border-bottom: 3px solid #2563eb; margin: 35px 0 15px 0; display: inline-block;">소제목</h3>"""
     elif style_key == "number_badge":
-        color = random.choice(style["colors"])
-        instruction = f"""소제목 HTML은 번호 원형 배지 스타일을 사용하세요 (번호를 1, 2, 3... 순서대로):
-<div style="display: flex; align-items: center; gap: 12px; margin: 30px 0 15px 0;">
-  <span style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: {color}; color: #fff; border-radius: 50%; font-weight: 700; font-size: 15px;">1</span>
-  <h4 style="font-size: 20px; font-weight: 600; color: #333; margin: 0;">소제목 텍스트</h4>
+        instruction = """소제목은 반드시 아래 HTML 형식을 사용하세요 (번호 배지 스타일, 번호를 1, 2, 3... 순서대로):
+<div style="display: flex; align-items: center; gap: 12px; margin: 35px 0 15px 0;">
+  <span style="background: #2563eb; color: white; width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; flex-shrink: 0;">1</span>
+  <h3 style="font-size: 20px; font-weight: 700; color: #1a1a1a; margin: 0;">소제목</h3>
 </div>"""
-    else:  # card_box
-        instruction = """소제목 HTML은 카드형 박스 스타일을 사용하세요:
-<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px; margin: 30px 0 15px 0;">
-  <h4 style="font-size: 20px; font-weight: 600; color: #1e293b; margin: 0;">소제목 텍스트</h4>
+    elif style_key == "card_box":
+        instruction = """소제목은 반드시 아래 HTML 형식을 사용하세요 (카드형 스타일):
+<div style="background: #f0f7ff; border: 1px solid #d0e3ff; border-radius: 10px; padding: 14px 20px; margin: 35px 0 15px 0;">
+  <h3 style="font-size: 19px; font-weight: 700; color: #1e40af; margin: 0;">📌 소제목</h3>
 </div>"""
+    else:  # simple_bold
+        instruction = """소제목은 반드시 아래 HTML 형식을 사용하세요 (심플 굵은 스타일):
+<h3 style="font-size: 22px; font-weight: 800; color: #111; margin: 40px 0 12px 0; letter-spacing: -0.5px;">소제목</h3>"""
 
     return style_key, instruction
 

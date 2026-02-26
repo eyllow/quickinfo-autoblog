@@ -255,7 +255,7 @@ class ImageFetcher:
                 self.base_url,
                 headers=self.headers,
                 params=params,
-                timeout=10
+                timeout=30
             )
             response.raise_for_status()
 

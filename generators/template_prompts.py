@@ -10,7 +10,7 @@ from config.templates import (
     get_outro_pattern,
     get_cta_config
 )
-from generators.prompts import CONTENT_CONSISTENCY_RULES
+from generators.prompts import CONTENT_CONSISTENCY_RULES, get_heading_style_instruction
 
 
 # =============================================================================
@@ -229,6 +229,9 @@ def generate_template_prompt(
     # 4. CTA 설정
     cta_config = get_cta_config()
 
+    # 5-1. 소제목 스타일 랜덤 선택
+    _, heading_instruction = get_heading_style_instruction()
+
     # 5. 프롬프트 구성
     prompt = f"""
 주제: '{keyword}'
@@ -240,10 +243,13 @@ def generate_template_prompt(
 [HTML 스타일 가이드]
 - 전체를 <div style="max-width: 700px; margin: 0 auto; font-size: 16px; line-height: 1.9; color: #333;">로 감싸기
 - 대제목: <h2 style="font-size: 26px; font-weight: 700; color: #222; text-align: center;">
-- 소제목: <div style="border-left: 3px solid #333; padding-left: 12px;"><h4>│ 제목</h4></div>
 - 본문: <p style="font-size: 16px; line-height: 2.0; color: #444; text-align: left;">
 - 리스트: <ul style="padding-left: 20px;"><li style="margin: 8px 0;">
 - 표: <table style="width: 100%; border-collapse: collapse; margin: 25px 0;">
+
+[소제목 스타일 - 반드시 아래 HTML 형식을 사용하세요]
+{heading_instruction}
+※ border-left 세로바(│) 스타일은 절대 사용하지 마세요. 위 스타일만 사용하세요.
 
 [서론 시작 문장 - 반드시 이 문장으로 시작하세요]
 "{intro_pattern}"
@@ -273,7 +279,7 @@ def generate_template_prompt(
                 count=section.get("selected_items", 5)
             )
             prompt += f"""
-{section_num}. │ {title}
+{section_num}. {title}
 """
             section_num += 1
 

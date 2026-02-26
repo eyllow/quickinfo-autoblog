@@ -606,6 +606,17 @@ class ContentGenerator:
         # AI 메타 응답 제거
         content = clean_ai_response(content)
 
+        # 본문 시작의 대제목 제거 (WP 테마가 별도로 제목 표시하므로 중복)
+        content = re.sub(r'^\s*<h2[^>]*style="[^"]*text-align:\s*center[^"]*"[^>]*>.*?</h2>\s*', '', content, count=1, flags=re.DOTALL)
+
+        # placeholder 이미지 제거
+        content = re.sub(r'<p[^>]*>\s*<img[^>]*src="https://via\.placeholder\.com[^"]*"[^>]*/?\s*>\s*</p>', '', content, flags=re.DOTALL)
+        content = re.sub(r'<img[^>]*src="https://via\.placeholder\.com[^"]*"[^>]*/?\s*>', '', content, flags=re.DOTALL)
+
+        # 남은 IMAGE 태그 및 IMG_CONTEXT 주석 제거
+        content = re.sub(r'<!-- IMG_CONTEXT: .+? -->\s*', '', content)
+        content = re.sub(r'\[IMAGE_\d+[^\]]*\]', '', content)
+
         # AdSense 최적화 후처리 (금지 표현 제거, 이모지 제한)
         content = post_process_content(content)
 
