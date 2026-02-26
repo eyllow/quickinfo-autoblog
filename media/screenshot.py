@@ -51,6 +51,10 @@ BLOCKED_SCREENSHOT_DOMAINS = [
     'namu.wiki',
     'namuwiki.kr',
     'namu.moe',
+    'gov.kr',        # 정부24 봇 차단
+    'bokjiro.go.kr', # 복지로 봇 차단
+    'hometax.go.kr', # 홈택스 봇 차단 (동적 렌더링)
+    'ei.go.kr',      # 고용보험 봇 차단
 ]
 
 

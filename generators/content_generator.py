@@ -479,7 +479,19 @@ class ContentGenerator:
 
         # 제목 생성에는 페르소나 미사용
         title = self._call_ai(prompt, max_tokens=200, use_persona=False)
-        return title.strip().strip('"\'')
+        title = title.strip().strip('"\'')
+        
+        # Gemini 제목 잘림 보정: 제목이 너무 짧으면 키워드 기반 재생성
+        if len(title) < 15:
+            logger.warning(f"Title too short ({len(title)} chars): '{title}', regenerating...")
+            fallback_prompt = f"'{keyword}'에 대한 블로그 글 제목을 40자 이내로 작성하세요. 제목만 한 줄로 출력하세요."
+            title = self._call_ai(fallback_prompt, max_tokens=100, use_persona=False)
+            title = title.strip().strip('"\'')
+            # 여전히 짧으면 키워드 직접 활용
+            if len(title) < 15:
+                title = f"{keyword} 총정리, 꼭 알아야 할 핵심 정보"
+        
+        return title
 
     def perform_web_search(self, keyword: str) -> dict:
         """
