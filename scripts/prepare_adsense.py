@@ -32,9 +32,9 @@ except ImportError:
     pass  # dotenv 없으면 환경변수에서 직접 읽기
 
 try:
-    import anthropic
+    import google.generativeai as genai
 except ImportError:
-    print("❌ anthropic 패키지 필요: pip install anthropic")
+    print("❌ google-generativeai 패키지 필요: pip install google-generativeai")
     sys.exit(1)
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 WP_BASE_URL = os.getenv("WP_BASE_URL", "https://quickinfo.kr/wp-json/wp/v2")
 WP_USER = os.getenv("WP_USER", "")
 WP_APP_PASSWORD = os.getenv("WP_APP_PASSWORD", "")
-CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-3-haiku-20240307")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 TARGET_COUNT = 12
 DELAY_SECONDS = 30
 
@@ -101,18 +101,17 @@ def fetch_published_posts(count: int = TARGET_COUNT) -> list:
     return posts
 
 
-def rewrite_with_claude(title: str, content: str) -> str:
-    """Claude API로 콘텐츠 리라이트"""
-    client = anthropic.Anthropic()
+def rewrite_with_gemini(title: str, content: str) -> str:
+    """Gemini API로 콘텐츠 리라이트"""
+    api_key = os.getenv("GOOGLE_API_KEY", "")
+    if not api_key:
+        raise ValueError("GOOGLE_API_KEY 환경변수를 설정하세요.")
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(GEMINI_MODEL)
     prompt = REWRITE_PROMPT.format(title=title, content=content)
 
-    message = client.messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=4096,
-        messages=[{"role": "user", "content": prompt}],
-    )
-
-    return message.content[0].text
+    response = model.generate_content(prompt)
+    return response.text
 
 
 def update_post(post_id: int, new_content: str) -> dict:
@@ -170,7 +169,7 @@ def main():
         try:
             # 2. Claude로 리라이트
             print("  ✍️  리라이트 중...")
-            new_content = rewrite_with_claude(title, content)
+            new_content = rewrite_with_gemini(title, content)
             print(f"  리라이트 길이: {len(new_content)}자")
 
             # 3. WP에 업데이트
