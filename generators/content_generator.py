@@ -1166,7 +1166,7 @@ class ContentGenerator:
                 # trend_context에 블로그 분석 추가
                 if not trend_context:
                     trend_context = ""
-                trend_context += f"\n\n[참고 블로그 구조 분석]\n{blog_analysis}\n위 인기 블로그의 구조와 소제목 패턴을 참고하여 작성하세요."
+                trend_context += f"\n\n[참고 블로그 구조 분석 — 반드시 반영!]\n{blog_analysis}\n\n위 인기 블로그의 소제목 흐름, 정보 배치 순서, 핵심 키워드를 최대한 유사하게 반영하세요. 특히:\n- 소제목 개수와 흐름을 비슷하게 구성\n- 인기 블로그에서 다루는 핵심 키워드를 빠짐없이 포함\n- 글 톤과 구성 방식(목록형/설명형/비교형)을 참고"
             else:
                 print(f"  ⚠️ 블로그 참조 결과 없음")
         except Exception as e:
@@ -1239,8 +1239,8 @@ class ContentGenerator:
         # 파트너스 문구 삽입
         content = self.insert_affiliate_notice(content, has_coupang)
 
-        # 카테고리 뱃지 삽입
-        content = self.insert_category_badge(content, category_name)
+        # 카테고리 뱃지 삽입 — 비활성화 (WP 테마에서 이미 표시)
+        # content = self.insert_category_badge(content, category_name)
 
         # 정리
         content = self.clean_meta_tags(content)

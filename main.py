@@ -207,6 +207,20 @@ def process_keyword(
             logger.info("=== DRY RUN END ===")
             return True
 
+        # 2.5. 발행 직전 최종 중복 체크
+        try:
+            recent = wp_publisher.get_recent_post_titles(days=14)
+            for rt, rs in recent:
+                rt_lower = rt.lower().strip()
+                title_lower = post.title.lower().strip()
+                kw_lower = keyword.lower().strip()
+                # 제목이 80% 이상 겹치거나 키워드가 최근 제목에 포함
+                if (kw_lower in rt_lower) or (title_lower in rt_lower) or (rt_lower in title_lower):
+                    logger.warning(f"DUPLICATE BLOCKED at publish time: '{post.title}' ~ '{rt}'")
+                    return False
+        except Exception as e:
+            logger.warning(f"Pre-publish dedup check failed: {e}")
+
         # 3. 워드프레스에 발행
         logger.info(f"Step 3: Publishing to WordPress (status: {status})...")
         result = wp_publisher.publish_with_image(
