@@ -659,7 +659,7 @@ class ContentGenerator:
 
             # 스크린샷인 경우 다른 캡션 사용
             if img_data.get('type') == 'screenshot':
-                caption = f"{img_data['alt']} (실시간 캡쳐)"
+                caption = f"{img_data['alt']}"
             else:
                 caption = f"{img_data['alt']} (Photo by {img_data['photographer']} on Pexels)"
 

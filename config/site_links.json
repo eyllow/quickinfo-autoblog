@@ -100,5 +100,65 @@
     "name": "네이버 날씨",
     "description": "날씨 정보",
     "keywords": ["날씨", "오늘날씨", "주간날씨"]
+  },
+  "고용24": {
+    "url": "https://www.work24.go.kr",
+    "name": "고용24",
+    "description": "고용노동부 고용서비스 통합 포털",
+    "keywords": ["고용24", "실업급여신청", "구직등록", "직업훈련", "고용지원금"]
+  },
+  "K패스": {
+    "url": "https://www.kpass.go.kr",
+    "name": "K패스",
+    "description": "대중교통 마일리지 적립",
+    "keywords": ["K패스", "교통카드", "대중교통할인", "알뜰교통카드"]
+  },
+  "한국장학재단": {
+    "url": "https://www.kosaf.go.kr",
+    "name": "한국장학재단",
+    "description": "국가장학금 및 학자금 대출",
+    "keywords": ["국가장학금", "학자금대출", "장학금", "생활비대출"]
+  },
+  "행정안전부": {
+    "url": "https://www.mois.go.kr",
+    "name": "행정안전부",
+    "description": "행정안전부 공식 사이트",
+    "keywords": ["재난지원금", "특별교부세", "안전신문고"]
+  },
+  "국토교통부실거래가": {
+    "url": "https://rt.molit.go.kr",
+    "name": "실거래가 공개시스템",
+    "description": "부동산 실거래가 조회",
+    "keywords": ["실거래가", "아파트시세", "부동산거래", "전세가"]
+  },
+  "복지로": {
+    "url": "https://www.bokjiro.go.kr",
+    "name": "복지로",
+    "description": "맞춤형 복지 서비스 안내 포털",
+    "keywords": ["복지로", "기초생활수급", "복지혜택", "보조금24"]
+  },
+  "소상공인마당": {
+    "url": "https://www.sbiz.or.kr",
+    "name": "소상공인마당",
+    "description": "소상공인진흥공단 지원사업",
+    "keywords": ["소상공인대출", "정책자금", "폐업지원", "소상공인"]
+  },
+  "중소벤처기업부": {
+    "url": "https://www.mss.go.kr",
+    "name": "중소벤처기업부",
+    "description": "중소기업 정책 지원",
+    "keywords": ["중소기업지원", "창업지원", "벤처인증"]
+  },
+  "대한법률구조공단": {
+    "url": "https://www.klac.or.kr",
+    "name": "대한법률구조공단",
+    "description": "무료 법률 상담 및 소송 지원",
+    "keywords": ["법률구조", "무료법률상담", "소송지원"]
+  },
+  "질병관리청": {
+    "url": "https://www.kdca.go.kr",
+    "name": "질병관리청",
+    "description": "감염병 및 예방접종 정보",
+    "keywords": ["예방접종", "코로나", "독감", "건강검진"]
   }
 }
