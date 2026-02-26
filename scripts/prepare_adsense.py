@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 WP_BASE_URL = os.getenv("WP_BASE_URL", "https://quickinfo.kr/wp-json/wp/v2")
 WP_USER = os.getenv("WP_USER", "")
 WP_APP_PASSWORD = os.getenv("WP_APP_PASSWORD", "")
-CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-3-5-haiku-20241022")
+CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-3-haiku-20240307")
 TARGET_COUNT = 12
 DELAY_SECONDS = 30
 
