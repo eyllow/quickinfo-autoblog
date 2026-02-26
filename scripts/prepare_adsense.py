@@ -21,7 +21,15 @@ from pathlib import Path
 import requests
 
 # 프로젝트 루트를 path에 추가
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+# .env 로드
+try:
+    from dotenv import load_dotenv
+    load_dotenv(PROJECT_ROOT / ".env")
+except ImportError:
+    pass  # dotenv 없으면 환경변수에서 직접 읽기
 
 try:
     import anthropic
@@ -38,7 +46,7 @@ logger = logging.getLogger(__name__)
 WP_BASE_URL = os.getenv("WP_BASE_URL", "https://quickinfo.kr/wp-json/wp/v2")
 WP_USER = os.getenv("WP_USER", "")
 WP_APP_PASSWORD = os.getenv("WP_APP_PASSWORD", "")
-CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-3-5-haiku-20241022")
 TARGET_COUNT = 12
 DELAY_SECONDS = 30
 
