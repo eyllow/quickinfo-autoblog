@@ -221,6 +221,8 @@ class GeneratedPost:
     has_coupang: bool = False
     sources: list = None  # 웹검색 출처 목록
     sections: List[Section] = field(default_factory=list)  # 섹션 배열
+    quality_score: float = 0.0  # 품질 점수 (0~100)
+    needs_regeneration: bool = False  # 재생성 필요 여부
 
     def __post_init__(self):
         if self.sources is None:
@@ -237,6 +239,8 @@ class GeneratedPost:
             "category": self.category,
             "template": self.template,
             "has_coupang": self.has_coupang,
+            "quality_score": self.quality_score,
+            "needs_regeneration": self.needs_regeneration,
             "sources": self.sources,
             "sections": [
                 {"id": s.id, "index": s.index, "type": s.type, "html": s.html}
@@ -475,8 +479,17 @@ class ContentGenerator:
             )
             logger.info(f"Using person title prompt for: {keyword}")
         else:
-            # 기존 제목 프롬프트
-            prompt = get_title_prompt(keyword)
+            # SEO 최적화 제목 프롬프트 (v2: 연관 키워드 반영)
+            related_kws = None
+            try:
+                from crawlers.naver_related import expand_keywords
+                expanded = expand_keywords(keyword)
+                related_kws = (expanded.get("autocomplete", []) + expanded.get("related", []))[:8]
+                if related_kws:
+                    logger.info(f"Title prompt with {len(related_kws)} related keywords for '{keyword}'")
+            except Exception as e:
+                logger.debug(f"Related keywords fetch for title failed: {e}")
+            prompt = get_title_prompt(keyword, related_keywords=related_kws)
 
         # 제목 생성에는 페르소나 미사용
         title = self._call_ai(prompt, max_tokens=200, use_persona=False)
@@ -578,6 +591,22 @@ class ContentGenerator:
             logger.info(f"Added web search data: {len(web_content)} chars from {len(sources)} sources")
         elif news_data:
             web_data_content += news_data
+
+        # 연관 키워드 수집 → 프롬프트에 반영 (SEO v2)
+        related_kw_section = ""
+        try:
+            from crawlers.naver_related import expand_keywords as _expand_kw
+            _expanded = _expand_kw(keyword)
+            _all_related = (_expanded.get("autocomplete", []) + _expanded.get("related", []))[:10]
+            if _all_related:
+                related_kw_section = (
+                    "\n[SEO 연관 키워드 — 본문과 소제목에 자연스럽게 2~3개 포함하세요]\n"
+                    + ", ".join(_all_related) + "\n"
+                )
+                web_data_content += related_kw_section
+                logger.info(f"Injected {len(_all_related)} related keywords into content prompt")
+        except Exception as _e:
+            logger.debug(f"Related keywords for content prompt failed: {_e}")
 
         # 인물 키워드 여부 확인
         is_person = is_person_keyword(keyword)
@@ -696,15 +725,16 @@ class ContentGenerator:
         keyword: str,
         category_name: str,
         count: int = 2,
-        use_mixed: bool = True
+        use_mixed: bool = True,
+        blog_analysis: dict = None
     ) -> str:
         """
-        혼합 이미지 시스템으로 [IMAGE_N] 태그를 실제 이미지로 교체
+        스마트 이미지 시스템으로 [IMAGE_N] 태그를 실제 이미지로 교체
 
-        Phase 3: Puppeteer 스크린샷 + Pexels 혼합
-
-        1. 스크린샷 조건 충족 시 첫 이미지를 스크린샷으로
-        2. 나머지는 AI 기반 Pexels 검색
+        개선된 기능:
+        1. 소제목 수 기반 적정 이미지 수 자동 계산
+        2. AI가 섹션별 최적 이미지 검색 키워드 생성
+        3. 참조 블로그 패턴에 맞춰 배치
 
         Args:
             content: HTML 본문
@@ -712,6 +742,7 @@ class ContentGenerator:
             category_name: 카테고리 이름
             count: 필요한 이미지 개수
             use_mixed: 혼합 이미지 시스템 사용 여부
+            blog_analysis: 블로그 분석 결과 (스마트 이미지용)
 
         Returns:
             이미지가 삽입된 HTML
@@ -719,8 +750,14 @@ class ContentGenerator:
         images = {}
 
         try:
-            # 혼합 이미지 시스템 사용 (Phase 3)
-            if use_mixed:
+            # 스마트 이미지 시스템 사용 (개선 버전)
+            if use_mixed and hasattr(self.image_fetcher, 'fetch_smart_images'):
+                logger.info(f"Fetching smart images for '{keyword}' (count: {count})")
+                images = self.image_fetcher.fetch_smart_images(
+                    content, keyword, category_name, blog_analysis
+                )
+            elif use_mixed:
+                # 기존 혼합 이미지 시스템 (폴백)
                 logger.info(f"Fetching mixed images for '{keyword}' (count: {count})")
                 images = self.image_fetcher.fetch_mixed_images(
                     content, keyword, category_name, count
@@ -1154,15 +1191,22 @@ class ContentGenerator:
         elif category_name in web_search_categories:
             print(f"  └─ 검색 결과: 없음")
 
-        # Step 2.5a: 블로그 참조 분석
-        print(f"\n[Step 2.5a/8] 블로그 참조 분석")
+        # Step 2.5a: 블로그 참조 분석 (강화: 5개 블로그, 상세 분석)
+        print(f"\n[Step 2.5a/8] 블로그 참조 분석 (강화)")
         blog_analysis = ""
+        blog_detailed = None  # 상세 분석 결과 (품질 점수용)
+        reference_keywords = []  # 참조 키워드 (품질 점수용)
         try:
             from crawlers.blog_reference import BlogReferenceCrawler
             blog_ref = BlogReferenceCrawler()
-            blog_analysis = blog_ref.get_blog_analysis(keyword, count=3)
+            blog_analysis = blog_ref.get_blog_analysis(keyword, count=5)
+            # 상세 분석도 가져오기 (키워드 커버리지 체크용)
+            blog_detailed = blog_ref.get_detailed_analysis(keyword, count=5)
+            if blog_detailed and blog_detailed.get("common_patterns"):
+                reference_keywords = blog_detailed["common_patterns"].get("common_keywords", [])[:15]
+                print(f"  ✅ 블로그 참조 분석 완료 ({len(blog_detailed.get('blogs', []))}개 분석)")
+                print(f"  └─ 공통 키워드: {', '.join(reference_keywords[:8])}")
             if blog_analysis:
-                print(f"  ✅ 블로그 참조 분석 완료")
                 # trend_context에 블로그 분석 추가
                 if not trend_context:
                     trend_context = ""
@@ -1172,6 +1216,29 @@ class ContentGenerator:
         except Exception as e:
             logger.warning(f"Blog reference failed: {e}")
             print(f"  ⚠️ 블로그 참조 실패: {e}")
+
+        # Step 2.5b: 성과 학습 — 과거 데이터 기반 콘텐츠 추천
+        performance_rec = None
+        try:
+            from utils.performance_learner import performance_learner
+            performance_rec = performance_learner.get_content_recommendations(category_name)
+            if performance_rec and performance_rec.get("based_on") == "performance_data":
+                print(f"\n  📊 성과 학습 추천: 글자수 {performance_rec['recommended_char_count']}, "
+                      f"이미지 {performance_rec['recommended_image_count']}개, "
+                      f"소제목 {performance_rec['recommended_heading_count']}개")
+                # 성과 데이터를 트렌드 컨텍스트에 반영
+                if not trend_context:
+                    trend_context = ""
+                trend_context += (
+                    f"\n\n[성과 학습 데이터 — 참고]\n"
+                    f"이 카테고리({category_name})의 고성과 글 평균: "
+                    f"글자수 약 {performance_rec['recommended_char_count']}자, "
+                    f"이미지 {performance_rec['recommended_image_count']}개, "
+                    f"소제목 {performance_rec['recommended_heading_count']}개. "
+                    f"이 수치를 참고하여 구성하세요."
+                )
+        except Exception as e:
+            logger.debug(f"Performance learner not available: {e}")
 
         # Step 2.5b: 인물 키워드 감지 (제목 생성 전에 필요)
         is_person = is_person_keyword(keyword)
@@ -1266,10 +1333,38 @@ class ContentGenerator:
         print("✅ 블로그 글 생성 완료!")
         print("=" * 60 + "\n")
 
+        # Step 8.5: 품질 점수 평가
+        quality_result = None
+        try:
+            from utils.quality_scorer import score_generated_content
+            quality_result = score_generated_content(
+                content=content,
+                keyword=keyword,
+                title=title,
+                reference_keywords=reference_keywords if reference_keywords else None
+            )
+            print(f"\n  📊 품질 점수: {quality_result.total_score:.1f}/100")
+            print(f"     - 글자수: {quality_result.length_score:.0f}/25 ({quality_result.char_count}자)")
+            print(f"     - 소제목: {quality_result.heading_score:.0f}/25 ({quality_result.heading_count}개)")
+            print(f"     - 이미지: {quality_result.image_score:.0f}/20 ({quality_result.image_count}개)")
+            print(f"     - 수치/예시: {quality_result.data_score:.0f}/15")
+            print(f"     - 키워드 커버리지: {quality_result.keyword_coverage:.0f}/15")
+            if quality_result.needs_regeneration:
+                print(f"  ⚠️ 재생성 권장 (60점 미만)")
+                for suggestion in quality_result.suggestions[:3]:
+                    print(f"     → {suggestion}")
+            else:
+                print(f"  ✅ 품질 통과")
+        except Exception as e:
+            logger.warning(f"Quality scoring failed (non-critical): {e}")
+            print(f"  ⚠️ 품질 점수 계산 실패: {e}")
+
         # 기존 로거 호출 (파일 로그용)
         logger.info(f"Post generation complete: {title}")
         logger.info(f"  Category: {category_name}, Template: {template_name}")
         logger.info(f"  Content: {len(content)} chars, Sections: {len(sections)}, Sources: {len(sources)}, Coupang: {has_coupang}")
+        if quality_result:
+            logger.info(f"  Quality: {quality_result.total_score:.1f}/100, Regen: {quality_result.needs_regeneration}")
 
         return GeneratedPost(
             title=title,
@@ -1279,7 +1374,9 @@ class ContentGenerator:
             template=template_name,
             has_coupang=has_coupang,
             sources=sources,
-            sections=sections
+            sections=sections,
+            quality_score=quality_result.total_score if quality_result else 0.0,
+            needs_regeneration=quality_result.needs_regeneration if quality_result else False,
         )
 
 

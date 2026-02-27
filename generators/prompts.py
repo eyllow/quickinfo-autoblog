@@ -884,30 +884,98 @@ WRITING_PROMPT = """
 결과는 순수 HTML만 출력하세요.
 """
 
-def get_title_prompt(keyword: str) -> str:
-    """제목 생성 프롬프트 (현재 연도 동적 반영)"""
+def get_title_prompt(keyword: str, related_keywords: list = None, search_intent: str = None) -> str:
+    """
+    제목 생성 프롬프트 (v2: SEO 최적화 + 검색 의도 매칭 + 연관 키워드 반영)
+
+    Args:
+        keyword: 메인 키워드
+        related_keywords: 네이버 자동완성/연관 검색어 리스트 (optional)
+        search_intent: 검색 의도 힌트 - "info"/"compare"/"howto"/"review" (optional)
+    """
     current_year = datetime.now().year
+
+    # 연관 키워드 섹션
+    related_section = ""
+    if related_keywords:
+        top_related = related_keywords[:5]
+        related_section = f"""
+[연관 검색어 참고 (자연스럽게 제목에 녹여주세요)]
+{', '.join(top_related)}
+"""
+
+    # 검색 의도별 제목 패턴
+    intent_patterns = {
+        "info": [
+            f"{keyword} 뜻과 핵심 정리 ({current_year}년 최신)",
+            f"{keyword} 알기 쉽게 정리한 핵심 포인트",
+            f"{keyword} 이것만 알면 충분합니다",
+        ],
+        "compare": [
+            f"{keyword} 장단점 비교, 어떤 게 나을까?",
+            f"{keyword} 차이점과 선택 기준 정리",
+            f"{keyword} 비교 분석, 현실적인 선택법",
+        ],
+        "howto": [
+            f"{keyword} 하는 법, 단계별 정리 ({current_year})",
+            f"{keyword} 방법 A to Z, 처음이라면 필독",
+            f"{keyword} 신청 방법과 조건 총정리",
+        ],
+        "review": [
+            f"{keyword} 실제 사용 후기와 솔직한 평가",
+            f"{keyword} 써본 사람이 알려주는 현실 리뷰",
+            f"{keyword} 추천 순위 TOP 5 ({current_year}년)",
+        ],
+    }
+
+    # 의도가 명시되지 않으면 다양한 패턴 제공
+    if search_intent and search_intent in intent_patterns:
+        examples = intent_patterns[search_intent]
+    else:
+        examples = [
+            f"{keyword} 핵심 정리, 이것만 보세요 ({current_year})",
+            f"{keyword} 하는 법, 단계별로 쉽게 정리",
+            f"{keyword} 비교 분석과 현실적인 선택법",
+            f"{keyword} {current_year}년 최신 정보 한눈에",
+        ]
+
+    examples_text = "\n".join(f'- "{ex}"' for ex in examples)
 
     return f"""
 주제: '{keyword}'
 
-블로그 글 제목을 작성해주세요.
+네이버 블로그 검색 상위 노출을 위한 SEO 최적화 제목을 작성해주세요.
 
 [현재 시점]: {current_year}년
 
-제목 규칙:
-1. 클릭을 유도하는 매력적인 제목
-2. 키워드 '{keyword}' 자연스럽게 포함
-3. 30~50자 이내
-4. 숫자 포함 권장 (예: "5가지", "{current_year}년")
-5. 연도 포함 시 반드시 {current_year}년 사용
+[필수 SEO 규칙]
+1. 핵심 키워드 '{keyword}'를 제목 앞쪽(앞 15자 이내)에 배치
+2. 30~45자 이내 (너무 길면 검색 결과에서 잘림)
+3. 검색자의 의도에 맞는 표현 사용:
+   - 정보형: "정리", "핵심", "알아보기"
+   - 방법형: "하는 법", "방법", "신청 절차"
+   - 비교형: "비교", "차이점", "vs"
+   - 추천형: "추천", "순위", "TOP"
+4. 연도({current_year}) 또는 시의성 표현 포함 권장
+5. 숫자 포함 시 구체적으로 (3가지, 5단계, TOP 7 등)
+{related_section}
+[금지 패턴 — 이런 제목은 절대 쓰지 마세요]
+- "완벽 가이드" (너무 뻔하고 클릭률 낮음)
+- "총정리" 단독 사용 (구체성 부족)
+- "알아보겠습니다" (블로그 글 같지 않음)
+- "꼭 알아야 할" (과장)
+- 키워드 단순 반복
 
-형식 예시:
-- "{keyword} 완벽 가이드, 이것만 알면 됩니다"
-- "{current_year} {keyword} 총정리 (+ 필수 정보 5가지)"
-- "{keyword} 하는 방법, 초보자도 쉽게 따라하기"
+[참고 형식 — 이런 스타일로 만들어주세요]
+{examples_text}
 
-제목만 출력하세요 (따옴표 없이)
+[클릭률 높은 제목의 특징]
+- 구체적인 숫자나 결과 제시
+- 독자가 얻을 이득이 명확
+- 궁금증을 자극하는 후반부
+- 과장 없이 신뢰감 있는 톤
+
+제목만 출력하세요 (따옴표, 번호 없이 한 줄)
 """
 
 # 레거시 호환용

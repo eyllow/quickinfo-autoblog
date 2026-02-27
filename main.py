@@ -24,8 +24,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config.settings import settings
 from database.models import db
 from crawlers import GoogleTrendsCrawler, NaverNewsCrawler
+from crawlers.blog_reference import BlogReferenceCrawler
 from generators import ContentGenerator
 from publishers import WordPressPublisher
+from utils.quality_scorer import score_generated_content
+from utils.performance_learner import performance_learner, get_keyword_scores
 
 # 로깅 설정
 logging.basicConfig(
@@ -171,6 +174,13 @@ def process_keyword(
     try:
         logger.info(f"Processing keyword: {keyword}")
 
+        # 0. 블로그 참조 분석 (강화 버전)
+        logger.info("Step 0: Blog reference analysis (enhanced)...")
+        blog_crawler = BlogReferenceCrawler()
+        blog_analysis = blog_crawler.get_detailed_analysis(keyword, count=5)
+        reference_keywords = blog_analysis.get("common_patterns", {}).get("common_keywords", [])
+        logger.info(f"Blog analysis: {len(blog_analysis.get('blogs', []))} blogs, {len(reference_keywords)} common keywords")
+
         # 1. 네이버 뉴스 검색 및 요약
         logger.info("Step 1: Fetching news data...")
         news_data = news_crawler.get_news_summary(keyword, max_articles=3)
@@ -189,6 +199,23 @@ def process_keyword(
         image_count = len(re.findall(r'<figure[^>]*>.*?<img[^>]*>.*?</figure>', post.content, re.DOTALL | re.IGNORECASE))
         logger.info(f"  - Images inserted: {image_count}")
         logger.info(f"  - Excerpt: {post.excerpt[:50]}..." if post.excerpt else "  - Excerpt: (none)")
+
+        # 2.5. 품질 점수 체크 (새로운 기능)
+        logger.info("Step 2.5: Quality score check...")
+        quality_result = score_generated_content(
+            content=post.content,
+            keyword=keyword,
+            title=post.title,
+            reference_keywords=reference_keywords
+        )
+        logger.info(f"  - Quality Score: {quality_result.total_score:.1f}/100")
+        logger.info(f"  - Char: {quality_result.char_count}, Headings: {quality_result.heading_count}, Images: {quality_result.image_count}")
+        if quality_result.suggestions:
+            logger.info(f"  - Suggestions: {'; '.join(quality_result.suggestions[:3])}")
+
+        # 품질 점수 미달 시 경고 (재생성은 미래 버전에서)
+        if quality_result.needs_regeneration:
+            logger.warning(f"  ⚠️ Quality score below threshold ({quality_result.total_score:.1f} < 60). Consider improvement.")
 
         # 웹검색 출처 표시
         if post.sources:
@@ -304,8 +331,16 @@ def run_pipeline(
         try:
             from crawlers.topic_selector import TopicSelector
             topic_selector = TopicSelector()
-            keywords = topic_selector.get_best_keywords(limit=posts_count)
+            keywords = topic_selector.get_best_keywords(limit=posts_count * 2)  # 성과 기반 필터링용 여유분
             logger.info(f"TopicSelector keywords: {keywords}")
+
+            # 성과 학습 기반 키워드 우선순위 조정
+            if len(keywords) > posts_count:
+                logger.info("Applying performance-based keyword scoring...")
+                scored_keywords = get_keyword_scores(keywords)
+                keywords = [kw for kw, _ in scored_keywords[:posts_count]]
+                logger.info(f"Performance-optimized keywords: {keywords}")
+
         except Exception as e:
             logger.warning(f"TopicSelector failed, falling back to Google Trends: {e}")
             all_keywords = trends_crawler.get_trending_keywords_simple(limit=20)

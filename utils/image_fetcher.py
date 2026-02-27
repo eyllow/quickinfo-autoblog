@@ -1,11 +1,19 @@
-"""Pexels API를 사용한 AI 기반 컨텍스트 이미지 검색 + Puppeteer 스크린샷"""
+"""Pexels API를 사용한 AI 기반 컨텍스트 이미지 검색 + Puppeteer 스크린샷
+
+스마트 이미지 삽입 시스템:
+- 소제목 수 기반 적정 이미지 수 계산 (소제목 2~3개당 1장, 최대 4~5장)
+- AI가 섹션별 최적 이미지 검색 키워드 자동 생성 (영문)
+- Pexels + Unsplash 듀얼 소스
+- 이미지 위치를 참조 블로그 패턴에 맞춰 배치
+- 글 길이 대비 적정 비율 자동 조절
+"""
 import json
 import logging
 import random
 import re
 import requests
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict, Tuple
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -134,7 +142,7 @@ class PexelsImage:
 
 
 class ImageFetcher:
-    """Pexels API 카테고리별 이미지 검색기"""
+    """Pexels API 카테고리별 이미지 검색기 (스마트 이미지 삽입 시스템)"""
 
     def __init__(self, api_key: str = None):
         self.api_key = api_key or settings.pexels_api_key
@@ -148,11 +156,298 @@ class ImageFetcher:
         self.used_image_ids = set()
         self.used_image_urls = set()
 
+        # Claude 클라이언트 초기화
+        try:
+            self.claude_client = anthropic.Anthropic(api_key=settings.claude_api_key)
+        except Exception as e:
+            logger.warning(f"Claude client initialization failed: {e}")
+            self.claude_client = None
+
     def reset_used_images(self):
         """새 글 생성 시 중복 목록 초기화"""
         self.used_image_ids.clear()
         self.used_image_urls.clear()
         logger.info("Image usage tracking reset")
+
+    # =========================================================================
+    # 스마트 이미지 삽입 시스템 메서드
+    # =========================================================================
+
+    def calculate_optimal_image_count(
+        self,
+        content: str,
+        blog_analysis: Dict = None
+    ) -> Tuple[int, List[int]]:
+        """
+        소제목 수 기반 적정 이미지 수 계산
+
+        규칙:
+        - 소제목 2~3개당 1장
+        - 최소 2장, 최대 5장
+        - 참조 블로그 패턴이 있으면 그에 맞춤
+
+        Args:
+            content: HTML 콘텐츠
+            blog_analysis: 블로그 분석 결과 (선택)
+
+        Returns:
+            (적정 이미지 수, 이미지 삽입 위치 인덱스 리스트)
+        """
+        # 소제목 추출
+        heading_pattern = r'<h[23][^>]*>([^<]+)</h[23]>'
+        headings = re.findall(heading_pattern, content, re.IGNORECASE)
+        num_headings = len(headings)
+
+        # 글 길이
+        text_only = re.sub(r'<[^>]+>', '', content)
+        content_length = len(text_only)
+
+        # 참조 블로그 패턴 기준
+        ref_avg_images = None
+        if blog_analysis and "common_patterns" in blog_analysis:
+            # 참조 블로그 평균 이미지 수 추정 (소제목당 약 1/3)
+            ref_headings = blog_analysis["common_patterns"].get("avg_headings", 6)
+            ref_avg_images = max(2, ref_headings // 3)
+
+        # 이미지 수 계산 (소제목 2~3개당 1장)
+        if num_headings > 0:
+            calculated_count = max(2, num_headings // 3 + 1)
+        else:
+            # 소제목 없으면 글 길이 기준
+            calculated_count = max(2, content_length // 1500)
+
+        # 참조 블로그 패턴 반영
+        if ref_avg_images:
+            calculated_count = (calculated_count + ref_avg_images) // 2
+
+        # 최대 5장으로 제한
+        optimal_count = min(5, max(2, calculated_count))
+
+        # 이미지 삽입 위치 계산 (균등 분배)
+        positions = []
+        if num_headings > 0:
+            # 소제목들 사이에 균등 배치
+            step = max(1, num_headings // optimal_count)
+            for i in range(optimal_count):
+                pos = min(i * step + 1, num_headings)  # 1-indexed
+                positions.append(pos)
+        else:
+            # 소제목 없으면 순차적으로
+            positions = list(range(1, optimal_count + 1))
+
+        logger.info(f"Smart image count: {optimal_count} (headings: {num_headings}, length: {content_length})")
+        return optimal_count, positions
+
+    def generate_section_image_keywords_smart(
+        self,
+        content: str,
+        keyword: str,
+        blog_analysis: Dict = None,
+        image_count: int = 4
+    ) -> List[Dict]:
+        """
+        AI로 섹션별 최적 이미지 검색 키워드 생성 (스마트 버전)
+
+        각 이미지 위치에 맞는 컨텍스트를 분석하여 최적의 영문 검색어 생성
+
+        Args:
+            content: HTML 콘텐츠
+            keyword: 메인 키워드
+            blog_analysis: 블로그 분석 결과 (선택)
+            image_count: 필요한 이미지 수
+
+        Returns:
+            [{position: int, query: str, context: str}, ...] 리스트
+        """
+        if not self.claude_client:
+            # 폴백: 기존 키워드 매핑 사용
+            return self._generate_fallback_keywords(keyword, image_count)
+
+        # 소제목과 섹션 내용 추출
+        sections = []
+        heading_pattern = r'<h[23][^>]*>([^<]+)</h[23]>(.*?)(?=<h[23]|$)'
+        matches = re.findall(heading_pattern, content, re.DOTALL | re.IGNORECASE)
+
+        for heading, section_content in matches:
+            clean_content = re.sub(r'<[^>]+>', ' ', section_content)
+            clean_content = re.sub(r'\s+', ' ', clean_content).strip()
+            sections.append({
+                "heading": heading.strip(),
+                "content": clean_content[:300]
+            })
+
+        if not sections:
+            return self._generate_fallback_keywords(keyword, image_count)
+
+        # AI에게 이미지 키워드 생성 요청
+        try:
+            sections_text = "\n".join([
+                f"섹션 {i+1}: {s['heading']}\n내용 미리보기: {s['content'][:150]}..."
+                for i, s in enumerate(sections[:image_count + 2])
+            ])
+
+            # 참조 블로그 키워드 정보 추가
+            ref_keywords = ""
+            if blog_analysis and "common_patterns" in blog_analysis:
+                common_kws = blog_analysis["common_patterns"].get("common_keywords", [])[:10]
+                if common_kws:
+                    ref_keywords = f"\n참고: 인기 블로그 공통 키워드: {', '.join(common_kws)}"
+
+            prompt = f"""블로그 글의 섹션별 이미지 검색어를 생성해주세요.
+
+[메인 키워드]: {keyword}
+[필요한 이미지 수]: {image_count}개
+
+[글 섹션 목록]:
+{sections_text}
+{ref_keywords}
+
+각 이미지에 어울리는 Pexels 검색어를 JSON 배열로 출력하세요.
+
+규칙:
+1. 영문 검색어만 (2~4단어)
+2. 실제 인물/연예인 이름 포함 금지
+3. Pexels에서 검색 가능한 구체적 이미지
+4. 각 섹션 내용과 관련된 키워드
+5. 서로 다른 이미지가 나오도록 다양하게
+
+출력 형식 (JSON만, 설명 없이):
+[
+  {{"position": 1, "query": "financial calculator documents", "section": "섹션제목"}},
+  {{"position": 2, "query": "office professional meeting", "section": "섹션제목"}}
+]"""
+
+            response = self.claude_client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=500,
+                messages=[{"role": "user", "content": prompt}]
+            )
+
+            response_text = response.content[0].text.strip()
+
+            # JSON 파싱
+            if '```' in response_text:
+                response_text = re.sub(r'```json\s*|\s*```', '', response_text)
+
+            keywords_data = json.loads(response_text)
+
+            # 검증
+            result = []
+            for item in keywords_data[:image_count]:
+                query = item.get("query", "")
+                if query and not re.search(r'[가-힣]', query):
+                    result.append({
+                        "position": item.get("position", len(result) + 1),
+                        "query": query,
+                        "section": item.get("section", "")
+                    })
+
+            if result:
+                logger.info(f"AI generated {len(result)} smart image keywords")
+                return result
+
+        except Exception as e:
+            logger.warning(f"Smart keyword generation failed: {e}")
+
+        return self._generate_fallback_keywords(keyword, image_count)
+
+    def _generate_fallback_keywords(self, keyword: str, count: int) -> List[Dict]:
+        """폴백: 기존 키워드 매핑 사용"""
+        search_keywords = self.get_search_keywords_for_topic(keyword)
+        return [
+            {"position": i + 1, "query": search_keywords[i % len(search_keywords)], "section": ""}
+            for i in range(count)
+        ]
+
+    def fetch_smart_images(
+        self,
+        content: str,
+        keyword: str,
+        category: str,
+        blog_analysis: Dict = None
+    ) -> Dict:
+        """
+        스마트 이미지 삽입 시스템 메인 메서드
+
+        1. 소제목 수 기반 적정 이미지 수 계산
+        2. AI로 섹션별 최적 검색 키워드 생성
+        3. Pexels + Unsplash 듀얼 소스 검색
+        4. 참조 블로그 패턴에 맞춰 배치
+
+        Args:
+            content: HTML 콘텐츠
+            keyword: 블로그 키워드
+            category: 카테고리 이름
+            blog_analysis: 블로그 분석 결과 (선택)
+
+        Returns:
+            {IMAGE_1: {url, alt, ...}, ...} 딕셔너리
+        """
+        print(f"\n🖼️ 스마트 이미지 시스템 시작: '{keyword}'")
+
+        # 1. 적정 이미지 수 계산
+        optimal_count, positions = self.calculate_optimal_image_count(content, blog_analysis)
+        print(f"  📊 적정 이미지 수: {optimal_count}개 (위치: {positions})")
+
+        # 2. AI로 섹션별 키워드 생성
+        image_keywords = self.generate_section_image_keywords_smart(
+            content, keyword, blog_analysis, optimal_count
+        )
+        print(f"  🔑 AI 검색 키워드 생성 완료: {len(image_keywords)}개")
+        for kw in image_keywords:
+            print(f"      - 위치 {kw['position']}: {kw['query']}")
+
+        # 3. 이미지 검색 (Pexels + Unsplash)
+        images = {}
+        used_urls = set()
+
+        for kw_data in image_keywords:
+            position = kw_data["position"]
+            query = kw_data["query"]
+
+            print(f"  🖼️ IMAGE_{position}: {query}")
+
+            # Pexels + Unsplash 듀얼 검색
+            photos = self.search_with_fallback(query, per_page=8)
+
+            if photos:
+                for photo in photos:
+                    img_url = photo.get("src", {}).get("large") or photo.get("src", {}).get("medium", "")
+                    if img_url and img_url not in used_urls:
+                        images[f"IMAGE_{position}"] = {
+                            'url': img_url,
+                            'alt': f"{keyword} 관련 이미지",
+                            'photographer': photo.get('photographer', 'Unknown'),
+                            'search_query': query,
+                            'type': 'pexels',
+                            'section': kw_data.get("section", "")
+                        }
+                        used_urls.add(img_url)
+                        print(f"      ✓ {img_url[:50]}...")
+                        break
+
+            # 검색 실패 시 폴백
+            if f"IMAGE_{position}" not in images:
+                fallback_query = self._get_fallback_query(keyword)
+                print(f"      ⚠️ 폴백 검색: {fallback_query}")
+                fallback_photos = self.search_with_fallback(fallback_query, per_page=5)
+
+                if fallback_photos:
+                    for photo in fallback_photos:
+                        img_url = photo.get("src", {}).get("large") or photo.get("src", {}).get("medium", "")
+                        if img_url and img_url not in used_urls:
+                            images[f"IMAGE_{position}"] = {
+                                'url': img_url,
+                                'alt': f"{keyword} 관련 이미지",
+                                'photographer': photo.get('photographer', 'Unknown'),
+                                'search_query': f"fallback: {fallback_query}",
+                                'type': 'pexels'
+                            }
+                            used_urls.add(img_url)
+                            break
+
+        print(f"\n  📸 총 {len(images)}개 이미지 확보\n")
+        return images
 
     def _load_categories(self) -> dict:
         """카테고리 설정 로드"""
