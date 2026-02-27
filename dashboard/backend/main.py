@@ -114,29 +114,71 @@ async def health_check():
 
 @app.get("/api/stats")
 async def get_stats():
-    """대시보드 통계"""
-    from dashboard.backend.routers.articles import articles_store
+    """대시보드 통계 (WP + DB 기반)"""
+    import requests as _req
+    import sqlite3
+    from datetime import datetime as _dt, timedelta
 
-    # 카테고리별 통계
-    categories = {}
-    published_count = 0
-    draft_count = 0
+    try:
+        from config.settings import settings as _s
 
-    for article in articles_store.values():
-        cat = article.get("category", "트렌드")
-        categories[cat] = categories.get(cat, 0) + 1
+        # WP에서 글 수 조회
+        published_count = 0
+        draft_count = 0
+        categories = {}
 
-        if article["status"] == "published":
-            published_count += 1
-        else:
-            draft_count += 1
+        for status in ["publish", "draft"]:
+            resp = _req.get(
+                f"{_s.wp_url}/wp-json/wp/v2/posts",
+                params={"status": status, "per_page": 1, "_fields": "id"},
+                auth=(_s.wp_user, _s.wp_app_password),
+                timeout=5,
+            )
+            if resp.status_code == 200:
+                total = int(resp.headers.get("X-WP-Total", 0))
+                if status == "publish":
+                    published_count = total
+                else:
+                    draft_count = total
 
-    return {
-        "total_articles": len(articles_store),
-        "published_count": published_count,
-        "draft_count": draft_count,
-        "categories": categories
-    }
+        # DB에서 카테고리 통계
+        db_path = Path(__file__).resolve().parent.parent.parent / "database" / "blog_publisher.db"
+        if db_path.exists():
+            conn = sqlite3.connect(str(db_path))
+            cursor = conn.cursor()
+            try:
+                cursor.execute("SELECT category, COUNT(*) FROM published_posts GROUP BY category")
+                for row in cursor.fetchall():
+                    categories[row[0] or "트렌드"] = row[1]
+            except Exception:
+                pass
+            conn.close()
+
+        # 에버그린 키워드 풀 크기
+        import json
+        eg_path = Path(__file__).resolve().parent.parent.parent / "config" / "evergreen_keywords.json"
+        keyword_pool = 0
+        if eg_path.exists():
+            eg_data = json.load(open(eg_path, encoding="utf-8"))
+            keyword_pool = len(eg_data.get("keywords", []))
+
+        return {
+            "total_articles": published_count + draft_count,
+            "published_count": published_count,
+            "draft_count": draft_count,
+            "categories": categories,
+            "keyword_pool": keyword_pool,
+            "target_for_adsense": 20,
+        }
+    except Exception as e:
+        logger.error(f"Stats error: {e}")
+        return {
+            "total_articles": 0,
+            "published_count": 0,
+            "draft_count": 0,
+            "categories": {},
+            "error": str(e),
+        }
 
 
 if __name__ == "__main__":

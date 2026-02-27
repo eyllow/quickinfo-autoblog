@@ -66,11 +66,10 @@ async def get_scheduler_status():
     except Exception as e:
         logger.error(f"DB 조회 실패: {e}")
 
-    # 스케줄 정보
+    # 스케줄 정보 (에버그린 2회/일)
     schedule = [
-        {"time": "07:00~07:30", "type": "트렌드", "status": "pending"},
-        {"time": "15:00~15:30", "type": "트렌드", "status": "pending"},
-        {"time": "18:00~18:30", "type": "에버그린", "status": "pending"},
+        {"time": "09:00~09:30", "type": "에버그린 (시즌)", "status": "pending"},
+        {"time": "18:00~18:30", "type": "에버그린 (트렌드매칭)", "status": "pending"},
     ]
 
     # 현재 시간 기준으로 상태 계산
@@ -80,12 +79,10 @@ async def get_scheduler_status():
     # 발행 완료 시간대 매칭
     for post in today_posts:
         hour = int(post["time"].split(":")[0]) if post["time"] else 0
-        if 7 <= hour < 12:
+        if 9 <= hour < 15:
             schedule[0]["status"] = "completed"
-        elif 12 <= hour < 18:
-            schedule[1]["status"] = "completed"
         elif hour >= 18:
-            schedule[2]["status"] = "completed"
+            schedule[1]["status"] = "completed"
 
     # 지난 시간대 중 미완료는 missed로 표시
     for i, s in enumerate(schedule):
@@ -104,7 +101,7 @@ async def get_scheduler_status():
         "is_running": is_running,
         "pid": pid,
         "today_completed": completed_count,
-        "today_total": 3,
+        "today_total": 2,
         "today_posts": today_posts[:5],
         "schedule": schedule,
         "next_publish": next_publish,
