@@ -88,38 +88,20 @@ def random_delay(min_minutes: int = 0, max_minutes: int = 30):
 # 스케줄 작업 정의
 # ============================================================
 
-def job_morning_trend():
-    """오전 7:00~7:30 - 트렌드 키워드 1개"""
+def job_morning_evergreen():
+    """오전 9:00~9:30 - 에버그린 키워드 1개 (시즌 기반)"""
     logger.info("=" * 60)
-    logger.info("[07:00 시간대] 트렌드 발행 작업 시작")
+    logger.info("[09:00 시간대] 에버그린 발행 작업 시작")
     logger.info("=" * 60)
 
-    # 0~30분 사이 랜덤 딜레이
     delay = random_delay(0, 30)
 
     try:
-        logger.info(f"트렌드 키워드 1개 발행 시작 (딜레이: {delay}분)")
-        run_pipeline(dry_run=False, posts_limit=1, evergreen=False)
-        logger.info("[07:00 시간대] 발행 완료!")
+        logger.info(f"에버그린 키워드 1개 발행 시작 (딜레이: {delay}분)")
+        run_pipeline(dry_run=False, posts_limit=1, evergreen=True)
+        logger.info("[09:00 시간대] 발행 완료!")
     except Exception as e:
-        logger.error(f"[07:00 시간대] 발행 실패: {e}")
-
-
-def job_afternoon_trend():
-    """오후 3:00~3:30 - 트렌드 키워드 1개"""
-    logger.info("=" * 60)
-    logger.info("[15:00 시간대] 트렌드 발행 작업 시작")
-    logger.info("=" * 60)
-
-    # 0~30분 사이 랜덤 딜레이
-    delay = random_delay(0, 30)
-
-    try:
-        logger.info(f"트렌드 키워드 1개 발행 시작 (딜레이: {delay}분)")
-        run_pipeline(dry_run=False, posts_limit=1, evergreen=False)
-        logger.info("[15:00 시간대] 발행 완료!")
-    except Exception as e:
-        logger.error(f"[15:00 시간대] 발행 실패: {e}")
+        logger.error(f"[09:00 시간대] 발행 실패: {e}")
 
 
 def job_evening_evergreen():
@@ -195,25 +177,16 @@ def run_scheduler(run_now: bool = False):
     # 스케줄러 생성
     scheduler = BlockingScheduler(timezone='Asia/Seoul')
 
-    # 1. 오전 7:00 트리거 → 7:00~7:30 사이 랜덤 발행
+    # 1. 오전 9:00 → 에버그린 1개 (시즌 키워드)
     scheduler.add_job(
-        job_morning_trend,
-        CronTrigger(hour=7, minute=0, timezone='Asia/Seoul'),
-        id='job_07_trend',
-        name='Morning Trend (07:00~07:30)',
+        job_morning_evergreen,
+        CronTrigger(hour=9, minute=0, timezone='Asia/Seoul'),
+        id='job_09_evergreen',
+        name='Morning Evergreen (09:00~09:30)',
         misfire_grace_time=3600
     )
 
-    # 2. 오후 3:00 트리거 → 3:00~3:30 사이 랜덤 발행
-    scheduler.add_job(
-        job_afternoon_trend,
-        CronTrigger(hour=15, minute=0, timezone='Asia/Seoul'),
-        id='job_15_trend',
-        name='Afternoon Trend (15:00~15:30)',
-        misfire_grace_time=3600
-    )
-
-    # 3. 오후 6:00 트리거 → 6:00~6:30 사이 랜덤 발행
+    # 2. 오후 6:00 → 에버그린 1개 (트렌드 매칭 우선)
     scheduler.add_job(
         job_evening_evergreen,
         CronTrigger(hour=18, minute=0, timezone='Asia/Seoul'),
@@ -230,7 +203,7 @@ def run_scheduler(run_now: bool = False):
     # 즉시 실행 옵션
     if run_now:
         logger.info("\n즉시 실행 모드...")
-        job_morning_trend()
+        job_morning_evergreen()
 
     logger.info("\nScheduler started. Press Ctrl+C to stop.")
 
@@ -246,12 +219,10 @@ def show_status():
     print("Auto Blog Publisher - Schedule Status")
     print("=" * 60)
     print("\nDaily Schedule (Asia/Seoul, 랜덤 시간):")
-    print("  1. 07:00~07:30 → 트렌드 키워드 1개")
-    print("  2. 15:00~15:30 → 트렌드 키워드 1개")
-    print("  3. 18:00~18:30 → 에버그린 키워드 1개")
-    print("\nTotal: 3 posts per day")
-    print("  - Trending: 2 posts")
-    print("  - Evergreen: 1 post")
+    print("  1. 09:00~09:30 → 에버그린 키워드 1개 (시즌 기반)")
+    print("  2. 18:00~18:30 → 에버그린 키워드 1개 (트렌드 매칭 우선)")
+    print("\nTotal: 2 posts per day (고품질 에버그린 중심)")
+    print("  - Evergreen: 2 posts")
     print("\n랜덤 시간 작동 방식:")
     print("  - 각 시간대 시작 시 트리거")
     print("  - 0~30분 사이 랜덤 딜레이 후 발행")

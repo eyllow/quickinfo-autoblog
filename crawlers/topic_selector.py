@@ -382,10 +382,31 @@ class TopicSelector:
         scored = []
         published_keywords = set(db.get_published_keywords())
 
+        # 스포츠/연예 차단 패턴 로드
+        try:
+            _eg_config = json.load(open(str(Path(__file__).resolve().parent.parent / "config" / "evergreen_keywords.json"), encoding="utf-8"))
+            _blocked_patterns = _eg_config.get("blocked_patterns", [])
+        except Exception:
+            _blocked_patterns = [
+                "경기 결과", "경기 하이라이트", "골 장면", "승리", "패배", "이적",
+                "우승", "결승", "16강", "8강", "챔피언스리그", "프리미어리그",
+                "KBO", "NBA", "UFC", "올림픽", "아이돌", "컴백", "팬미팅", "콘서트",
+            ]
+
         for keyword, sources in keywords_sources.items():
             if keyword in published_keywords:
                 continue
             if db.is_similar_keyword_published(keyword, days=7):
+                continue
+
+            # 스포츠/연예 키워드 차단
+            _is_blocked = False
+            for bp in _blocked_patterns:
+                if bp in keyword:
+                    _is_blocked = True
+                    logger.info(f"Blocked keyword '{keyword}' (pattern: {bp})")
+                    break
+            if _is_blocked:
                 continue
 
             score = 0.0
@@ -486,7 +507,10 @@ class TopicSelector:
         # 4. Zum 실시간 검색어
         zum_keywords = self.get_zum_keywords()
         for kw in zum_keywords:
-            keywords_sources.setdefault(kw, set()).add("zum")
+            # 순번 접두사 제거 (예: "1설영우 16강 탈락" → "설영우 16강 탈락")
+            cleaned = re.sub(r'^\d+', '', kw).strip()
+            if cleaned:
+                keywords_sources.setdefault(cleaned, set()).add("zum")
 
         # 5. Google Daily Trends
         gd_keywords = self.get_google_daily_trends()
