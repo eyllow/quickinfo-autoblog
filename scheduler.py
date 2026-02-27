@@ -89,12 +89,12 @@ def random_delay(min_minutes: int = 0, max_minutes: int = 30):
 # ============================================================
 
 def job_morning_evergreen():
-    """오전 9:00~9:30 - 에버그린 키워드 1개 (시즌 기반)"""
+    """오전 9:00~9:45 - 에버그린 키워드 1개 (시즌 기반)"""
     logger.info("=" * 60)
     logger.info("[09:00 시간대] 에버그린 발행 작업 시작")
     logger.info("=" * 60)
 
-    delay = random_delay(0, 30)
+    delay = random_delay(0, 45)
 
     try:
         logger.info(f"에버그린 키워드 1개 발행 시작 (딜레이: {delay}분)")
@@ -110,8 +110,8 @@ def job_evening_evergreen():
     logger.info("[18:00 시간대] 에버그린 발행 작업 시작")
     logger.info("=" * 60)
 
-    # 0~30분 사이 랜덤 딜레이
-    delay = random_delay(0, 30)
+    # 0~45분 사이 랜덤 딜레이
+    delay = random_delay(0, 45)
 
     try:
         # 시즌/트렌드 기반 키워드 미리 로깅
@@ -161,13 +161,11 @@ def run_scheduler(run_now: bool = False):
     logger.info("Auto Blog Publisher Scheduler")
     logger.info("=" * 60)
     logger.info("Schedule (랜덤 시간):")
-    logger.info("  07:00~07:30 → 트렌드 1개")
-    logger.info("  15:00~15:30 → 트렌드 1개")
-    logger.info("  18:00~18:30 → 에버그린 1개")
+    logger.info("  09:00~09:45 → 에버그린 1개 (시즌 기반)")
+    logger.info("  18:00~18:45 → 에버그린 1개 (트렌드 매칭)")
     logger.info("-" * 60)
-    logger.info("Total: 3 posts per day")
-    logger.info("  - Trending: 2 posts")
-    logger.info("  - Evergreen: 1 post")
+    logger.info("Total: 2 posts per day")
+    logger.info("  - Evergreen: 2 posts")
     logger.info("=" * 60)
 
     # 시그널 핸들러 등록
