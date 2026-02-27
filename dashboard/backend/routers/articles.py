@@ -343,12 +343,24 @@ async def get_publish_history(days: int = 30):
         cursor = conn.cursor()
 
         since = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
-        cursor.execute("""
-            SELECT keyword, title, wp_url, category, created_at
-            FROM published_posts
-            WHERE date(created_at) >= ?
-            ORDER BY created_at DESC
-        """, (since,))
+
+        # 컬럼 확인 (category가 있을 수도 없을 수도)
+        cursor.execute("PRAGMA table_info(published_posts)")
+        columns = [col[1] for col in cursor.fetchall()]
+        has_category = "category" in columns
+
+        if has_category:
+            cursor.execute("""
+                SELECT keyword, title, wp_url, category, created_at
+                FROM published_posts WHERE date(created_at) >= ?
+                ORDER BY created_at DESC
+            """, (since,))
+        else:
+            cursor.execute("""
+                SELECT keyword, title, wp_url, created_at
+                FROM published_posts WHERE date(created_at) >= ?
+                ORDER BY created_at DESC
+            """, (since,))
 
         history = []
         for row in cursor.fetchall():
@@ -356,7 +368,7 @@ async def get_publish_history(days: int = 30):
                 "keyword": row["keyword"],
                 "title": row["title"],
                 "url": row["wp_url"],
-                "category": row["category"] if "category" in row.keys() else "트렌드",
+                "category": row["category"] if has_category and "category" in row.keys() else "에버그린",
                 "date": row["created_at"],
             })
         conn.close()
