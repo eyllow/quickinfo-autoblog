@@ -289,6 +289,84 @@ async def get_article_stats():
         }
 
 
+@router.get("/published")
+async def get_published_posts(limit: int = 20):
+    """WP에서 발행된 글 목록 조회"""
+    try:
+        import requests
+        from config.settings import settings
+
+        resp = requests.get(
+            f"{settings.wp_url}/wp-json/wp/v2/posts",
+            params={
+                "per_page": limit,
+                "orderby": "date",
+                "order": "desc",
+                "status": "any",
+                "_fields": "id,title,status,date,link,categories",
+            },
+            auth=(settings.wp_user, settings.wp_app_password),
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            return {"posts": [], "error": f"WP API error: {resp.status_code}"}
+
+        posts = []
+        for p in resp.json():
+            posts.append({
+                "id": p["id"],
+                "title": p["title"]["rendered"],
+                "status": p["status"],
+                "date": p["date"],
+                "url": p.get("link", ""),
+            })
+        return {"posts": posts, "total": len(posts)}
+
+    except Exception as e:
+        logger.error(f"Failed to fetch WP posts: {e}")
+        return {"posts": [], "error": str(e)}
+
+
+@router.get("/history")
+async def get_publish_history(days: int = 30):
+    """로컬 DB에서 발행 이력 조회"""
+    try:
+        import sqlite3
+        from datetime import timedelta
+
+        db_path = PROJECT_ROOT / "database" / "blog_publisher.db"
+        if not db_path.exists():
+            return {"history": [], "error": "DB not found"}
+
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        since = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        cursor.execute("""
+            SELECT keyword, title, wp_url, category, created_at
+            FROM published_posts
+            WHERE date(created_at) >= ?
+            ORDER BY created_at DESC
+        """, (since,))
+
+        history = []
+        for row in cursor.fetchall():
+            history.append({
+                "keyword": row["keyword"],
+                "title": row["title"],
+                "url": row["wp_url"],
+                "category": row["category"] if "category" in row.keys() else "트렌드",
+                "date": row["created_at"],
+            })
+        conn.close()
+        return {"history": history, "total": len(history)}
+
+    except Exception as e:
+        logger.error(f"Failed to fetch history: {e}")
+        return {"history": [], "error": str(e)}
+
+
 @router.get("/{article_id}", response_model=ArticleResponse)
 async def get_article(article_id: str):
     """글 조회"""
@@ -909,81 +987,3 @@ async def natural_edit(article_id: str, request: NaturalEditRequest):
             success=False,
             error=str(e)
         )
-
-
-@router.get("/published")
-async def get_published_posts(limit: int = 20):
-    """WP에서 발행된 글 목록 조회"""
-    try:
-        import requests
-        from config.settings import settings
-
-        resp = requests.get(
-            f"{settings.wp_url}/wp-json/wp/v2/posts",
-            params={
-                "per_page": limit,
-                "orderby": "date",
-                "order": "desc",
-                "status": "any",
-                "_fields": "id,title,status,date,link,categories",
-            },
-            auth=(settings.wp_user, settings.wp_app_password),
-            timeout=10,
-        )
-        if resp.status_code != 200:
-            return {"posts": [], "error": f"WP API error: {resp.status_code}"}
-
-        posts = []
-        for p in resp.json():
-            posts.append({
-                "id": p["id"],
-                "title": p["title"]["rendered"],
-                "status": p["status"],
-                "date": p["date"],
-                "url": p.get("link", ""),
-            })
-        return {"posts": posts, "total": len(posts)}
-
-    except Exception as e:
-        logger.error(f"Failed to fetch WP posts: {e}")
-        return {"posts": [], "error": str(e)}
-
-
-@router.get("/history")
-async def get_publish_history(days: int = 30):
-    """로컬 DB에서 발행 이력 조회"""
-    try:
-        import sqlite3
-        from datetime import timedelta
-
-        db_path = PROJECT_ROOT / "database" / "blog_publisher.db"
-        if not db_path.exists():
-            return {"history": [], "error": "DB not found"}
-
-        conn = sqlite3.connect(str(db_path))
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-
-        since = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
-        cursor.execute("""
-            SELECT keyword, title, wp_url, category, created_at
-            FROM published_posts
-            WHERE date(created_at) >= ?
-            ORDER BY created_at DESC
-        """, (since,))
-
-        history = []
-        for row in cursor.fetchall():
-            history.append({
-                "keyword": row["keyword"],
-                "title": row["title"],
-                "url": row["wp_url"],
-                "category": row["category"] if "category" in row.keys() else "트렌드",
-                "date": row["created_at"],
-            })
-        conn.close()
-        return {"history": history, "total": len(history)}
-
-    except Exception as e:
-        logger.error(f"Failed to fetch history: {e}")
-        return {"history": [], "error": str(e)}
