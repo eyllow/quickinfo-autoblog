@@ -13,6 +13,7 @@
 import argparse
 import json
 import logging
+from typing import Optional
 import re
 import sys
 from datetime import datetime
@@ -94,7 +95,7 @@ def save_evergreen_index(index: int):
         logger.error(f"Error saving evergreen index: {e}")
 
 
-def get_next_evergreen_keyword() -> str | None:
+def get_next_evergreen_keyword() -> Optional[str]:
     """
     다음 에버그린 키워드 반환
 

@@ -498,12 +498,23 @@ class ContentGenerator:
         # Gemini 제목 잘림 보정: 제목이 너무 짧으면 키워드 기반 재생성
         if len(title) < 15:
             logger.warning(f"Title too short ({len(title)} chars): '{title}', regenerating...")
-            fallback_prompt = f"'{keyword}'에 대한 블로그 글 제목을 40자 이내로 작성하세요. 제목만 한 줄로 출력하세요."
+            from datetime import datetime as _dt
+            _year = _dt.now().year
+            fallback_prompt = f"""'{keyword}'에 대한 블로그 글 제목을 작성하세요.
+
+규칙:
+1. 25~40자 이내
+2. '{keyword}'를 앞쪽에 배치
+3. 구체적인 정보를 담을 것 (숫자, 방법, 비교 등)
+4. "꼭 알아야 할", "핵심 정보", "완벽 가이드", "총정리" 사용 금지
+
+좋은 예: "{keyword} {_year}년 달라진 점 5가지"
+제목만 한 줄로 출력하세요."""
             title = self._call_ai(fallback_prompt, max_tokens=100, use_persona=False)
             title = title.strip().strip('"\'')
-            # 여전히 짧으면 키워드 직접 활용
+            # 여전히 짧으면 키워드 + 연도 기반 제목
             if len(title) < 15:
-                title = f"{keyword}, 꼭 알아야 할 핵심 정보"
+                title = f"{keyword} {_year}년 핵심 정리와 실전 활용법"
         
         # 제목 중복 단어 제거 (예: "총정리 총정리" → "총정리")
         import re as _re
@@ -632,6 +643,15 @@ class ContentGenerator:
         max_tokens = 8000
 
         content = self._call_ai(prompt, max_tokens=max_tokens)
+
+        # 글자수 미달 시 1회 재생성 (최소 2000자 미만이면 재시도)
+        plain_text = re.sub(r'<[^>]+>', '', content)
+        plain_text = re.sub(r'\s+', ' ', plain_text).strip()
+        if len(plain_text) < 2000:
+            logger.warning(f"Content too short ({len(plain_text)} chars), regenerating with stronger length enforcement...")
+            print(f"  ⚠️ 글자수 미달 ({len(plain_text)}자) → 재생성 중...")
+            retry_prompt = prompt + f"\n\n🚨 [긴급] 이전 응답이 {len(plain_text)}자로 심각하게 부족했습니다. 반드시 3500자 이상 작성하세요. 소제목 5개 이상, 각 섹션 400자 이상 필수!"
+            content = self._call_ai(retry_prompt, max_tokens=max_tokens)
 
         # HTML 코드 블록 제거
         content = re.sub(r'^```html\s*', '', content, flags=re.MULTILINE)
@@ -778,6 +798,14 @@ class ContentGenerator:
             content = re.sub(r'\[IMAGE_\d+[^\]]*\]', '', content)  # [IMAGE_N: 설명] 포함
             return content
 
+        # WP 미디어 업로드용 퍼블리셔 (핫링크 방지)
+        wp_publisher = None
+        try:
+            from publishers.wordpress import WordPressPublisher
+            wp_publisher = WordPressPublisher()
+        except Exception as e:
+            logger.warning(f"WP publisher init failed, using hotlink: {e}")
+
         # 각 이미지 태그를 실제 이미지로 교체
         for tag, img_data in images.items():
             # URL 유효성 확인
@@ -785,12 +813,40 @@ class ContentGenerator:
                 logger.warning(f"Invalid image URL for {tag}: {img_data.get('url')}")
                 continue
 
+            # WP 미디어에 업로드 시도 (핫링크 대신 자체 호스팅)
+            final_url = img_data['url']
+            if wp_publisher:
+                try:
+                    media_id = wp_publisher.upload_image(
+                        image_url=img_data['url'],
+                        title=img_data.get('alt', keyword)
+                    )
+                    if media_id:
+                        # 업로드된 이미지 URL 가져오기
+                        import requests as _req
+                        from config.settings import settings as _settings
+                        media_resp = _req.get(
+                            f"{_settings.wp_url}/wp-json/wp/v2/media/{media_id}",
+                            auth=(_settings.wp_user, _settings.wp_app_password),
+                            timeout=10
+                        )
+                        if media_resp.status_code == 200:
+                            media_data = media_resp.json()
+                            final_url = media_data.get("source_url", final_url)
+                            logger.info(f"Image uploaded to WP: {final_url}")
+                        else:
+                            logger.warning(f"Failed to get uploaded media URL, using original")
+                    else:
+                        logger.warning(f"WP upload returned None for {tag}, using hotlink")
+                except Exception as e:
+                    logger.warning(f"WP upload failed for {tag}: {e}, using hotlink")
+
             # 캡션: 주제 관련 설명 (Pexels 출처 제거)
             caption = img_data.get('alt', keyword)
 
             img_html = f'''
 <figure style="text-align: center; margin: 30px 0;">
-    <img src="{img_data['url']}"
+    <img src="{final_url}"
          alt="{img_data['alt']}"
          style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);"
          loading="lazy" />

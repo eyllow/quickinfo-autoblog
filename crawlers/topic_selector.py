@@ -19,11 +19,26 @@ from database.models import db
 
 logger = logging.getLogger(__name__)
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                  "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
-}
+import random as _random
+
+_USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+]
+
+def _get_headers():
+    return {
+        "User-Agent": _random.choice(_USER_AGENTS),
+        "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Referer": "https://www.naver.com/",
+        "Connection": "keep-alive",
+    }
+
+HEADERS = _get_headers()
 
 # 상업적 키워드 패턴 (광고 수익 가능성 높은 키워드)
 COMMERCIAL_PATTERNS = [
@@ -81,129 +96,171 @@ class TopicSelector:
     # =========================================================================
 
     def get_naver_datalab_keywords(self) -> List[str]:
-        """네이버 DataLab 실시간 검색어 수집"""
+        """네이버 DataLab 실시간 검색어 수집 (v2: 다중 폴백)"""
+        keywords = []
+
+        # 방법 1: 네이버 DataLab 쇼핑인사이트 (더 안정적)
         try:
             url = "https://datalab.naver.com/keyword/realtimeList.naver"
-            resp = requests.get(url, headers=HEADERS, timeout=10)
-            resp.raise_for_status()
-            soup = BeautifulSoup(resp.text, "html.parser")
-
-            keywords = []
-            for item in soup.select(".ranking_item .item_title, .keyword_rank .title"):
-                text = item.get_text(strip=True)
-                if text and len(text) >= 2:
-                    keywords.append(text)
-
-            if not keywords:
-                try:
-                    api_url = "https://datalab.naver.com/keyword/realtimeList.naver?age=20s"
-                    resp2 = requests.get(api_url, headers=HEADERS, timeout=10)
-                    if resp2.status_code == 200:
-                        soup2 = BeautifulSoup(resp2.text, "html.parser")
-                        for span in soup2.select("span.title"):
-                            text = span.get_text(strip=True)
-                            if text and len(text) >= 2:
-                                keywords.append(text)
-                except Exception:
-                    pass
-
-            logger.info(f"Naver DataLab keywords: {len(keywords)}")
-            return keywords[:20]
-
+            resp = requests.get(url, headers=_get_headers(), timeout=10)
+            if resp.status_code == 200:
+                soup = BeautifulSoup(resp.text, "html.parser")
+                for item in soup.select(".ranking_item .item_title, .keyword_rank .title, span.title"):
+                    text = item.get_text(strip=True)
+                    if text and len(text) >= 2 and text not in keywords:
+                        keywords.append(text)
         except Exception as e:
-            logger.warning(f"Naver DataLab fetch failed: {e}")
-            return []
+            logger.debug(f"Naver DataLab primary failed: {e}")
+
+        # 방법 2: 네이버 실시간 급상승 검색어 (모바일 API)
+        if not keywords:
+            try:
+                url = "https://m.search.naver.com/p/csearch/content/qapirender.nhn?key=RealTimeSearchRank&where=nexearch&_callback=cb"
+                resp = requests.get(url, headers=_get_headers(), timeout=10)
+                if resp.status_code == 200:
+                    # JSONP 파싱
+                    import re as _re
+                    json_match = _re.search(r'cb\((.*)\)', resp.text, _re.DOTALL)
+                    if json_match:
+                        data = json.loads(json_match.group(1))
+                        items = data.get("data", [])
+                        for item in items:
+                            kw = item.get("keyword", "")
+                            if kw and len(kw) >= 2:
+                                keywords.append(kw)
+            except Exception as e:
+                logger.debug(f"Naver mobile realtime failed: {e}")
+
+        # 방법 3: 네이버 뉴스 인기 검색어 추출 (폴백)
+        if not keywords:
+            try:
+                url = "https://news.naver.com/"
+                resp = requests.get(url, headers=_get_headers(), timeout=10)
+                if resp.status_code == 200:
+                    soup = BeautifulSoup(resp.text, "html.parser")
+                    for a in soup.select("a.cjs_t, .rankingnews_head a, .ofhd_lst a"):
+                        text = a.get_text(strip=True)
+                        if text and 2 <= len(text) <= 30 and text not in keywords:
+                            keywords.append(text)
+            except Exception as e:
+                logger.debug(f"Naver news fallback failed: {e}")
+
+        logger.info(f"Naver DataLab keywords: {len(keywords)}")
+        return keywords[:20]
 
     # =========================================================================
     # 소스 3: Signal.bz 실시간 급상승 검색어 (NEW)
     # =========================================================================
 
     def get_signal_keywords(self) -> List[str]:
-        """signal.bz에서 네이버 실시간 급상승 검색어 수집"""
-        try:
-            resp = requests.get("https://m.signal.bz/naver", headers=HEADERS, timeout=10)
-            resp.raise_for_status()
-            soup = BeautifulSoup(resp.text, "html.parser")
+        """signal.bz 또는 대안 소스에서 실시간 급상승 검색어 수집"""
+        keywords = []
 
-            keywords = []
-            # signal.bz의 키워드 리스트 추출 (여러 셀렉터 시도)
-            for selector in [
-                "a.signal-keyword", "li.list-item a", ".rank-text",
-                "a[href*='search.naver']", ".keyword-list a", "span.keyword",
-                ".list_area a", "td a",
-            ]:
-                for el in soup.select(selector):
-                    text = el.get_text(strip=True)
-                    if text and 2 <= len(text) <= 30 and text not in keywords:
-                        keywords.append(text)
+        # 방법 1: signal.bz (기존)
+        for url in ["https://signal.bz/news", "https://m.signal.bz/naver", "https://signal.bz/"]:
+            try:
+                resp = requests.get(url, headers=_get_headers(), timeout=8)
+                if resp.status_code != 200:
+                    continue
+                soup = BeautifulSoup(resp.text, "html.parser")
+
+                for selector in [
+                    "a.signal-keyword", "li.list-item a", ".rank-text",
+                    "a[href*='search.naver']", ".keyword-list a", "span.keyword",
+                    ".list_area a", "td a",
+                ]:
+                    for el in soup.select(selector):
+                        text = el.get_text(strip=True)
+                        if text and 2 <= len(text) <= 30 and text not in keywords:
+                            keywords.append(text)
+                    if keywords:
+                        break
+
+                # 폴백: 네이버 검색 URL 파싱
+                if not keywords:
+                    for a in soup.find_all("a", href=True):
+                        href = a.get("href", "")
+                        if "search.naver.com" in href and "query=" in href:
+                            m = re.search(r"query=([^&]+)", href)
+                            if m:
+                                from urllib.parse import unquote
+                                kw = unquote(m.group(1))
+                                if kw and 2 <= len(kw) <= 30 and kw not in keywords:
+                                    keywords.append(kw)
+
                 if keywords:
                     break
+            except Exception as e:
+                logger.debug(f"Signal.bz ({url}) failed: {e}")
+                continue
 
-            # 폴백: 모든 링크에서 네이버 검색 URL 파싱
-            if not keywords:
-                for a in soup.find_all("a", href=True):
-                    href = a.get("href", "")
-                    if "search.naver.com" in href and "query=" in href:
-                        m = re.search(r"query=([^&]+)", href)
-                        if m:
-                            from urllib.parse import unquote
-                            kw = unquote(m.group(1))
-                            if kw and 2 <= len(kw) <= 30 and kw not in keywords:
-                                keywords.append(kw)
+        # 방법 2: 네이버 실검 대안 — 다음 실시간 이슈
+        if not keywords:
+            try:
+                resp = requests.get("https://www.daum.net/", headers=_get_headers(), timeout=8)
+                if resp.status_code == 200:
+                    soup = BeautifulSoup(resp.text, "html.parser")
+                    for a in soup.select(".rank_cont a, .hot_issue a, .realtime_issue a, a.link_issue"):
+                        text = a.get_text(strip=True)
+                        if text and 2 <= len(text) <= 30 and text not in keywords:
+                            keywords.append(text)
+            except Exception as e:
+                logger.debug(f"Daum fallback failed: {e}")
 
-            logger.info(f"Signal.bz keywords: {len(keywords)}")
-            return keywords[:20]
-
-        except Exception as e:
-            logger.warning(f"Signal.bz fetch failed: {e}")
-            return []
+        logger.info(f"Signal.bz keywords: {len(keywords)}")
+        return keywords[:20]
 
     # =========================================================================
     # 소스 4: Zum 실시간 검색어 (NEW)
     # =========================================================================
 
     def get_zum_keywords(self) -> List[str]:
-        """Zum 실시간 급상승 검색어 수집"""
-        try:
-            # Zum 실시간 검색어 API
-            api_url = "https://search.zum.com/search/issue/realtimeKeyword"
-            resp = requests.get(api_url, headers=HEADERS, timeout=10)
+        """Zum 실시간 급상승 검색어 수집 (v2: 다중 엔드포인트)"""
+        keywords = []
 
-            keywords = []
-            if resp.status_code == 200:
-                try:
-                    data = resp.json()
-                    # API 응답 구조에 따라 파싱
-                    items = data if isinstance(data, list) else data.get("items", data.get("keywords", data.get("data", [])))
-                    for item in items:
-                        if isinstance(item, str):
-                            keywords.append(item)
-                        elif isinstance(item, dict):
-                            kw = item.get("keyword", item.get("name", item.get("title", "")))
-                            if kw:
-                                keywords.append(kw)
-                except (json.JSONDecodeError, ValueError):
-                    pass
+        # 방법 1: Zum API
+        for api_url in [
+            "https://search.zum.com/search/issue/realtimeKeyword",
+            "https://issue.zum.com/api/v2/issue/realtime",
+        ]:
+            try:
+                resp = requests.get(api_url, headers=_get_headers(), timeout=8)
+                if resp.status_code == 200:
+                    try:
+                        data = resp.json()
+                        items = data if isinstance(data, list) else data.get("items", data.get("keywords", data.get("data", [])))
+                        for item in items:
+                            if isinstance(item, str):
+                                keywords.append(item)
+                            elif isinstance(item, dict):
+                                kw = item.get("keyword", item.get("name", item.get("title", "")))
+                                if kw and kw not in keywords:
+                                    keywords.append(kw)
+                    except (json.JSONDecodeError, ValueError):
+                        pass
+                if keywords:
+                    break
+            except Exception:
+                continue
 
-            # 폴백: Zum 메인 페이지에서 스크래핑
-            if not keywords:
-                resp2 = requests.get("https://zum.com/", headers=HEADERS, timeout=10)
-                if resp2.status_code == 200:
-                    soup = BeautifulSoup(resp2.text, "html.parser")
-                    for selector in [".realtime_keyword", ".issue_keyword", ".hot-keyword", "a.keyword"]:
+        # 방법 2: Zum 메인 페이지 스크래핑
+        if not keywords:
+            try:
+                resp = requests.get("https://zum.com/", headers=_get_headers(), timeout=8)
+                if resp.status_code == 200:
+                    soup = BeautifulSoup(resp.text, "html.parser")
+                    for selector in [".realtime_keyword", ".issue_keyword", ".hot-keyword", "a.keyword", ".rank_list a", "a[href*='search.zum.com']"]:
                         for el in soup.select(selector):
                             text = el.get_text(strip=True)
-                            if text and 2 <= len(text) <= 30:
+                            if text and 2 <= len(text) <= 30 and text not in keywords:
                                 keywords.append(text)
                         if keywords:
                             break
+            except Exception as e:
+                logger.debug(f"Zum page scrape failed: {e}")
 
-            logger.info(f"Zum keywords: {len(keywords)}")
-            return keywords[:20]
-
-        except Exception as e:
-            logger.warning(f"Zum fetch failed: {e}")
-            return []
+        logger.info(f"Zum keywords: {len(keywords)}")
+        return keywords[:20]
 
     # =========================================================================
     # 소스 5: Google Trends Daily Trends (실시간 보강) (NEW)

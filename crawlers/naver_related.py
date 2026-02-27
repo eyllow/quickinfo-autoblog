@@ -13,11 +13,29 @@ logger = logging.getLogger(__name__)
 AUTOCOMPLETE_URL = "https://ac.search.naver.com/nx/ac"
 SEARCH_URL = "https://search.naver.com/search.naver"
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                  "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept-Language": "ko-KR,ko;q=0.9",
-}
+import random as _random
+
+_USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+]
+
+def _get_headers():
+    return {
+        "User-Agent": _random.choice(_USER_AGENTS),
+        "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Referer": "https://www.naver.com/",
+        "Connection": "keep-alive",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "same-origin",
+    }
+
+HEADERS = _get_headers()
 
 
 def get_autocomplete(keyword: str, display: int = 10) -> List[str]:
@@ -46,7 +64,7 @@ def get_autocomplete(keyword: str, display: int = 10) -> List[str]:
     }
 
     try:
-        resp = requests.get(AUTOCOMPLETE_URL, params=params, headers=HEADERS, timeout=10)
+        resp = requests.get(AUTOCOMPLETE_URL, params=params, headers=_get_headers(), timeout=10)
         resp.raise_for_status()
         data = resp.json()
 
@@ -74,7 +92,7 @@ def get_related_keywords(keyword: str) -> List[str]:
     params = {"where": "nexearch", "query": keyword}
 
     try:
-        resp = requests.get(SEARCH_URL, params=params, headers=HEADERS, timeout=10)
+        resp = requests.get(SEARCH_URL, params=params, headers=_get_headers(), timeout=10)
         resp.raise_for_status()
         html = resp.text
 
