@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>all the rules | Your Pick</title>
+<meta name="description" content="심리학, 경제, 자기계발 영상 속 추천 상품 모음">
+<meta property="og:title" content="all the rules | Your Pick">
+<meta property="og:description" content="세상의 모든 법칙을 1분 안에 ⚡ 영상 속 추천 도서 & 상품">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{min-height:100vh;background:#0a0a0a;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",sans-serif}
+a{text-decoration:none;color:#fff}
+.container{max-width:440px;margin:0 auto;padding:0 16px 40px}
+.header{text-align:center;padding:36px 0 24px}
+.avatar{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 12px}
+.name{font-size:20px;font-weight:800;letter-spacing:-0.5px}
+.bio{font-size:13px;color:#999;margin-top:4px;line-height:1.5}
+.social-row{display:flex;justify-content:center;gap:10px;margin-top:14px}
+.social-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06)}
+.ref-banner{padding:10px 14px;margin-bottom:16px;background:rgba(102,126,234,0.1);border-radius:10px;border:1px solid rgba(102,126,234,0.2);font-size:13px;color:#aaa;text-align:center;display:none}
+.ref-banner b{color:#fff;font-weight:600}
+.today-card{display:flex;gap:14px;align-items:center;background:linear-gradient(135deg,rgba(102,126,234,0.15),rgba(118,75,162,0.15));border:1px solid rgba(102,126,234,0.3);border-radius:16px;padding:16px;margin-top:28px}
+.today-thumb{flex-shrink:0;width:90px;height:120px;border-radius:8px;overflow:hidden;background:#1a1a2e}
+.today-thumb img{width:100%;height:100%;object-fit:cover}
+.today-info{flex:1}
+.today-badge{display:inline-block;background:#ff3b5c;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;margin-bottom:6px}
+.today-title{font-size:18px;font-weight:800;margin-bottom:3px}
+.today-subtitle{font-size:12px;color:#aaa;margin-bottom:8px;line-height:1.4}
+.today-meta{display:flex;justify-content:space-between;align-items:center}
+.today-price{font-size:16px;font-weight:700;color:#667eea}
+.today-rating{font-size:11px;color:#ffd700}
+.today-cta{margin-top:10px;padding:9px 0;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:8px;text-align:center;font-size:13px;font-weight:700}
+.section{margin-top:32px}
+.section-title{font-size:14px;font-weight:700;color:#888;margin-bottom:12px;letter-spacing:0.5px}
+.list{display:flex;flex-direction:column;gap:8px}
+.book-item,.product-item{display:flex;align-items:center;gap:12px;padding:10px 12px;background:rgba(255,255,255,0.05);border-radius:10px;border:1px solid rgba(255,255,255,0.06)}
+.book-thumb{flex-shrink:0;width:44px;height:58px;border-radius:6px;overflow:hidden;background:#1a1a2e}
+.book-thumb img{width:100%;height:100%;object-fit:cover}
+.book-info{flex:1;min-width:0}
+.book-title{font-size:14px;font-weight:600}
+.book-author{font-size:12px;color:#999;font-weight:400}
+.book-price{font-size:12px;color:#667eea;font-weight:600;margin-top:2px}
+.arrow{font-size:18px;color:#555;flex-shrink:0}
+.product-icon{flex-shrink:0;width:52px;height:52px;border-radius:8px;background:#1a1a2e;display:flex;align-items:center;justify-content:center;font-size:28px}
+.product-title{font-size:14px;font-weight:600}
+.product-subtitle{font-size:11px;color:#888;margin-top:2px}
+.product-meta{display:flex;align-items:center;gap:8px;margin-top:3px}
+.product-price{font-size:13px;color:#667eea;font-weight:700}
+.product-rating{font-size:11px;color:#ffd700}
+.disclaimer{margin-top:32px;padding:14px;background:rgba(255,255,255,0.03);border-radius:8px;font-size:10px;color:#555;line-height:1.6;text-align:center}
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- Header -->
+<div class="header">
+  <div class="avatar">📐</div>
+  <div class="name">all the rules</div>
+  <div class="bio">세상의 모든 법칙을 1분 안에 ⚡<br>심리학 · 경제 · 자기계발 · 인간관계</div>
+  <div class="social-row">
+    <a href="https://www.youtube.com/@alltherulesKR?sub_confirmation=1" target="_blank" class="social-btn">🎬 YouTube</a>
+    <a href="https://www.tiktok.com/@wecreatetiktok" target="_blank" class="social-btn">🎵 TikTok</a>
+  </div>
+</div>
+
+<!-- ref 배너 -->
+<div class="ref-banner" id="refBanner">
+  🎬 <b id="refLabel"></b> 영상을 보셨군요! 관련 도서를 추천해요
+</div>
+
+<!-- 오늘의 추천 -->
+<a class="today-card" id="todayCard" href="#" target="_blank" rel="noopener noreferrer">
+  <div class="today-thumb"><img id="todayImg" src="" alt="" loading="lazy"></div>
+  <div class="today-info">
+    <div class="today-badge" id="todayBadge">🔥 오늘의 추천</div>
+    <div class="today-title" id="todayTitle"></div>
+    <div class="today-subtitle" id="todaySubtitle"></div>
+    <div class="today-meta">
+      <span class="today-price" id="todayPrice"></span>
+      <span class="today-rating" id="todayRating"></span>
+    </div>
+    <div class="today-cta">🛒 쿠팡에서 보기</div>
+  </div>
+</a>
+
+<!-- 추천 도서 -->
+<div class="section">
+  <div class="section-title">📚 추천 도서</div>
+  <div class="list" id="bookList"></div>
+</div>
+
+<!-- 같이 보면 좋은 상품 -->
+<div class="section">
+  <div class="section-title">💰 같이 보면 좋은 상품</div>
+  <div class="list" id="productList"></div>
+</div>
+
+<!-- 고지문구 -->
+<div class="disclaimer">
+  이 페이지는 쿠팡 파트너스 활동의 일환으로,<br>
+  이에 따른 일정액의 수수료를 제공받습니다.<br>
+  <span style="margin-top:4px;display:block">© 2026 The Favorite Inc.</span>
+</div>
+
+</div>
+
+<script>
+// ===== 데이터 =====
+const BOOKS = [
+  { id:'book-0', title:'생각에 관한 생각', subtitle:'다니엘 카너먼 | 노벨상 수상 행동경제학의 바이블', author:'다니엘 카너먼', price:'18,900원', rating:'⭐ 4.8 (2,340)', thumb:'https://image.yes24.com/goods/65600516/XL', url:'https://link.coupang.com/a/dVugbU', tags:['심리학','경제'] },
+  { id:'book-1', title:'넛지', subtitle:'리처드 탈러 | 똑똑한 선택을 이끄는 힘', author:'리처드 탈러', price:'16,200원', rating:'⭐ 4.7 (1,890)', thumb:'https://image.yes24.com/goods/3228974/XL', url:'https://link.coupang.com/a/dVuviL', tags:['심리학','경제'] },
+  { id:'book-2', title:'부의 추월차선', subtitle:'MJ 드마코 | 부자가 되는 빠른 길', author:'MJ 드마코', price:'15,120원', rating:'⭐ 4.6 (3,210)', thumb:'https://image.yes24.com/goods/16566564/XL', url:'https://link.coupang.com/a/dVuiiN', tags:['경제','자기계발'] },
+  { id:'book-3', title:'마인드셋', subtitle:'캐롤 드웩 | 성장의 비밀을 밝히다', author:'캐롤 드웩', price:'14,400원', rating:'⭐ 4.7 (2,150)', thumb:'https://image.yes24.com/goods/32951948/XL', url:'https://link.coupang.com/a/dVukJ7', tags:['자기계발','심리학'] },
+  { id:'book-4', title:'팩트풀니스', subtitle:'한스 로슬링 | 세상을 올바르게 보는 습관', author:'한스 로슬링', price:'15,300원', rating:'⭐ 4.8 (1,760)', thumb:'https://image.yes24.com/goods/68361373/XL', url:'https://link.coupang.com/a/dVul3O', tags:['심리학','자기계발'] },
+  { id:'book-5', title:'설득의 심리학', subtitle:'로버트 치알디니 | 사람을 움직이는 6가지 원칙', author:'로버트 치알디니', price:'17,100원', rating:'⭐ 4.8 (4,520)', thumb:'https://image.yes24.com/goods/117463580/XL', url:'https://link.coupang.com/a/dVunP8', tags:['심리학'] },
+];
+
+const PRODUCTS = [
+  { title:'고려은단 멀티비타민 올인원', subtitle:'하루 한 알로 비타민 13종+미네랄', price:'12,900원', rating:'⭐ 4.7', emoji:'💊', url:'https://link.coupang.com/a/dVuqp9' },
+  { title:'필립스 TAT1215 블루투스 이어폰', subtitle:'가성비 끝판왕 로켓배송', price:'19,800원', rating:'⭐ 4.6', emoji:'🎧', url:'https://link.coupang.com/a/dVusYF' },
+  { title:'브라운 오리지널 플러스 아기물티슈 캡형', subtitle:'55g × 80매 × 10개 | 43% 할인 | 로켓배송', price:'18,900원', rating:'⭐ 5.0 (53,320)', emoji:'🧻', url:'https://link.coupang.com/a/dVuJDr' },
+];
+
+const REF_MAP = {
+  '플라시보효과':{cat:'심리학',label:'플라시보 효과',bookId:'book-1'},
+  '넛지이론':{cat:'심리학',label:'넛지 이론',bookId:'book-1'},
+  '확증편향':{cat:'심리학',label:'확증 편향',bookId:'book-4'},
+  '피그말리온효과':{cat:'심리학',label:'피그말리온 효과',bookId:'book-3'},
+  '더닝크루거':{cat:'심리학',label:'더닝크루거 효과',bookId:'book-5'},
+  '후광효과':{cat:'심리학',label:'후광 효과',bookId:'book-5'},
+  '바넘효과':{cat:'심리학',label:'바넘 효과',bookId:'book-5'},
+  '앵커링효과':{cat:'심리학',label:'앵커링 효과',bookId:'book-1'},
+  '프레이밍효과':{cat:'심리학',label:'프레이밍 효과',bookId:'book-1'},
+  '밴드왜건효과':{cat:'심리학',label:'밴드왜건 효과',bookId:'book-5'},
+  '파레토법칙':{cat:'경제',label:'파레토 법칙',bookId:'book-2'},
+  '매몰비용':{cat:'경제',label:'매몰비용',bookId:'book-0'},
+  '기회비용':{cat:'경제',label:'기회비용',bookId:'book-2'},
+  '복리':{cat:'경제',label:'복리의 마법',bookId:'book-2'},
+  '나비효과':{cat:'경제',label:'나비효과',bookId:'book-0'},
+  '마인드셋':{cat:'자기계발',label:'마인드셋',bookId:'book-3'},
+  '1만시간':{cat:'자기계발',label:'1만 시간의 법칙',bookId:'book-3'},
+  '성장마인드셋':{cat:'자기계발',label:'성장 마인드셋',bookId:'book-3'},
+  '생활용품':{cat:'생활',label:'추천 상품'},
+  '건강':{cat:'생활',label:'건강 추천'},
+};
+
+// ===== 로직 =====
+const params = new URLSearchParams(window.location.search);
+const ref = params.get('ref') || '';
+const refInfo = REF_MAP[ref] || null;
+
+// 정렬
+let sorted = [...BOOKS];
+if (refInfo) {
+  sorted.sort((a, b) => {
+    if (refInfo.bookId) {
+      if (a.id === refInfo.bookId) return -1;
+      if (b.id === refInfo.bookId) return 1;
+    }
+    const am = a.tags.includes(refInfo.cat) ? 1 : 0;
+    const bm = b.tags.includes(refInfo.cat) ? 1 : 0;
+    return bm - am;
+  });
+}
+
+const today = sorted[0];
+const rest = sorted.slice(1);
+
+// ref 배너
+if (refInfo) {
+  document.getElementById('refBanner').style.display = 'block';
+  document.getElementById('refLabel').textContent = refInfo.label;
+}
+
+// 오늘의 추천
+document.getElementById('todayCard').href = today.url;
+document.getElementById('todayImg').src = today.thumb;
+document.getElementById('todayImg').alt = today.title;
+document.getElementById('todayBadge').textContent = refInfo ? '🎬 ' + refInfo.label + ' 추천 도서' : '🔥 오늘의 추천';
+document.getElementById('todayTitle').textContent = today.title;
+document.getElementById('todaySubtitle').textContent = today.subtitle;
+document.getElementById('todayPrice').textContent = today.price;
+document.getElementById('todayRating').textContent = today.rating;
+
+// 도서 리스트
+const bookList = document.getElementById('bookList');
+rest.forEach(b => {
+  bookList.innerHTML += `
+    <a href="${b.url}" target="_blank" rel="noopener noreferrer" class="book-item">
+      <div class="book-thumb"><img src="${b.thumb}" alt="${b.title}" loading="lazy"></div>
+      <div class="book-info">
+        <div class="book-title">${b.title} <span class="book-author">— ${b.author}</span></div>
+        <div class="book-price">${b.price}</div>
+      </div>
+      <span class="arrow">›</span>
+    </a>`;
+});
+
+// 상품 리스트
+const productList = document.getElementById('productList');
+PRODUCTS.forEach(p => {
+  productList.innerHTML += `
+    <a href="${p.url}" target="_blank" rel="noopener noreferrer" class="product-item">
+      <div class="product-icon">${p.emoji}</div>
+      <div class="book-info">
+        <div class="product-title">${p.title}</div>
+        <div class="product-subtitle">${p.subtitle}</div>
+        <div class="product-meta">
+          <span class="product-price">${p.price}</span>
+          <span class="product-rating">${p.rating}</span>
+        </div>
+      </div>
+      <span class="arrow">›</span>
+    </a>`;
+});
+</script>
+</body>
+</html>
