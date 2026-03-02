@@ -302,19 +302,96 @@ JSON으로만 응답 (다른 텍스트 없이):
 
         return uploaded
 
+    def analyze_photos(self, photo_paths: List[str]) -> List[Dict]:
+        """Gemini Vision으로 각 사진의 내용을 분석"""
+        descriptions = []
+        try:
+            from PIL import Image as PILImage
+        except ImportError:
+            # PIL 없으면 빈 설명 반환
+            return [{"index": i, "description": "사진", "category": "기타"} for i in range(len(photo_paths))]
+
+        for i, path in enumerate(photo_paths):
+            try:
+                img = PILImage.open(path)
+                result = self.model.generate_content(
+                    [
+                        "이 사진을 간결하게 분석해. JSON만 출력:\n"
+                        '{"description": "사진 내용 한 줄 설명", '
+                        '"category": "외관|내부|음식|음료|전시|풍경|인물|기타", '
+                        '"key_objects": ["주요 사물 3개 이내"]}',
+                        img,
+                    ],
+                    generation_config=genai.types.GenerationConfig(
+                        max_output_tokens=300,
+                        temperature=0.2,
+                    ),
+                )
+                text = result.text.replace("```json", "").replace("```", "").strip()
+                data = json.loads(text)
+                data["index"] = i
+                descriptions.append(data)
+                logger.info(f"Photo {i+1}: {data.get('category', '?')} - {data.get('description', '')[:50]}")
+            except Exception as e:
+                logger.warning(f"Photo {i+1} analysis failed: {e}")
+                descriptions.append({"index": i, "description": "사진", "category": "기타"})
+
+        return descriptions
+
+    def _build_reference_summary(self, references: List[Dict], analysis_text: str) -> str:
+        """참조 블로그 정보를 프롬프트용으로 정리"""
+        lines = []
+        if references:
+            lines.append("[참조 블로그 분석]")
+            for i, ref in enumerate(references[:5], 1):
+                title = ref.get("title", "제목 없음")
+                word_count = ref.get("word_count", 0)
+                tone = ref.get("tone", "")
+                headings = ref.get("headings", [])
+                lines.append(f"  블로그 {i}: \"{title}\"")
+                if word_count:
+                    lines.append(f"    - 글 길이: {word_count}자")
+                if tone:
+                    lines.append(f"    - 톤: {tone}")
+                if headings:
+                    lines.append(f"    - 소제목: {' / '.join(headings[:6])}")
+            lines.append("")
+
+        if analysis_text:
+            # 분석 텍스트가 너무 길면 앞부분만
+            if len(analysis_text) > 2000:
+                analysis_text = analysis_text[:2000] + "\n..."
+            lines.append(analysis_text)
+
+        return "\n".join(lines)
+
     def generate_blog_content(
         self,
         memo: str,
         keywords: Dict,
         photos: List[Dict],
         reference_analysis: str = "",
+        references: List[Dict] = None,
+        photo_descriptions: List[Dict] = None,
     ) -> Dict:
         """AI로 블로그 글 생성"""
 
-        # 사진 배치 계획
+        # 사진 배치 계획 (Vision 분석 결과 포함)
         photo_slots = ""
         for p in photos:
-            photo_slots += f'\n- [PHOTO_{p["index"]+1}]: {p["url"]}'
+            idx = p["index"]
+            desc = "사진"
+            cat = "기타"
+            if photo_descriptions:
+                for pd in photo_descriptions:
+                    if pd["index"] == idx:
+                        desc = pd.get("description", "사진")
+                        cat = pd.get("category", "기타")
+                        break
+            photo_slots += f'\n- [PHOTO_{idx+1}] ({cat}): {desc} → URL: {p["url"]}'
+
+        # 참조 블로그 요약
+        ref_summary = self._build_reference_summary(references or [], reference_analysis)
 
         prompt = f"""너는 네이버/구글 블로그 SEO 전문 작가야. 아래 정보를 바탕으로 블로그 글을 작성해.
 
@@ -324,21 +401,26 @@ JSON으로만 응답 (다른 텍스트 없이):
 - 카테고리: {keywords.get('category', '일상')}
 - 작성자 메모: {memo}
 
-[사용 가능한 사진] ({len(photos)}장)
+[사용 가능한 사진과 내용] ({len(photos)}장)
 {photo_slots}
 
-{f'[참조 블로그 분석]{chr(10)}{reference_analysis}' if reference_analysis else ''}
+{ref_summary}
 
 [작성 규칙]
 1. HTML 형식으로 작성 (마크다운 **금지**, ** 절대 사용 금지)
 2. 2,000~3,000자 분량
 3. 자연스럽고 따뜻한 1인칭 톤 ("~했어요", "~더라고요")
 4. 소제목 4~6개 (h2 태그)
-5. 사진은 적절한 위치에 figure/img 태그로 삽입
-6. 각 사진에 자연스러운 캡션 추가
-7. 인기 블로그 스타일 참고하되 표절하지 않기
-8. 장소 정보 (주소, 영업시간 등)가 있으면 마지막에 정리
+5. **사진-내용 매칭 필수**: 각 사진의 카테고리와 설명을 읽고, 해당 내용을 다루는 섹션에 정확히 배치
+   - 음료/음식 사진 → 반드시 메뉴/음식 소개 섹션에 배치
+   - 외관 사진 → 외관 소개 섹션에 배치
+   - 내부 사진 → 내부 분위기 섹션에 배치
+   - 전시/풍경 사진 → 관련 섹션에 배치
+6. 각 사진에 자연스러운 캡션 추가 (figcaption)
+7. **반복 금지**: 같은 의미의 문장을 다른 표현으로 반복하지 않기. 장소명은 전체 글에서 3회 이내 사용. 각 섹션마다 새로운 정보나 관점 제공
+8. 참조 블로그의 구조와 길이를 참고하되 표절하지 않기
 9. SEO 키워드: "{keywords.get('search_keyword', memo)}" 본문에 3~5회 자연스럽게 포함
+10. 모든 사진을 빠짐없이 사용할 것 (사진이 있는데 사용하지 않는 것은 금지)
 
 [출력 형식] JSON만 출력 (다른 텍스트 없이):
 {{
@@ -390,8 +472,14 @@ JSON으로만 응답 (다른 텍스트 없이):
             for ref in references[:3]:
                 print(f"    - {ref['title'][:40]}")
 
+            # 2.5. 사진 내용 분석 (Vision)
+            print(f"\n[2.5/6] 사진 내용 분석 중 ({len(request.photos)}장)...")
+            photo_descriptions = self.analyze_photos(request.photos)
+            for pd in photo_descriptions:
+                print(f"  📷 사진 {pd['index']+1}: [{pd.get('category', '?')}] {pd.get('description', '')[:60]}")
+
             # 3. 사진 업로드
-            print(f"\n[3/5] 사진 업로드 중 ({len(request.photos)}장)...")
+            print(f"\n[3/6] 사진 업로드 중 ({len(request.photos)}장)...")
             uploaded_photos = self.upload_photos_to_wp(request.photos)
             print(f"  업로드 완료: {len(uploaded_photos)}장")
 
@@ -419,6 +507,8 @@ JSON으로만 응답 (다른 텍스트 없이):
                 keywords=keywords,
                 photos=uploaded_photos,
                 reference_analysis=analysis_text,
+                references=references,
+                photo_descriptions=photo_descriptions,
             )
             print(f"  제목: {blog_data['title']}")
             print(f"  본문: {len(blog_data.get('content', ''))}자")
