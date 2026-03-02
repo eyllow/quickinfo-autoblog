@@ -107,30 +107,19 @@ JSON 배열로만 응답. 다른 텍스트 없이:
         else:
             return ""
 
-        # HTML 카드 생성
-        cards_html = '<div style="margin: 0 0 30px 0;">\n<h3 style="margin-bottom: 15px;">📌 관련 사이트 바로가기</h3>\n'
+        # HTML 카드 생성 — WP 호환 (div 대신 span, wpautop 우회)
+        cards_html = '<table style="border:none;border-collapse:collapse;width:100%;margin:0 0 30px 0;"><tr><td style="border:none;padding:0;"><h3 style="margin-bottom:15px;">📌 관련 사이트 바로가기</h3>'
         for site in sites[:4]:
             name = site.get("name", "")
             url = site.get("url", "")
             desc = site.get("desc", "")
             color = site.get("color", "#1a73e8")
             initial = site.get("initial", name[0] if name else "?")
+            domain = url.replace('https://','').replace('http://','').split('/')[0]
 
-            cards_html += f"""
-<a href="{url}" target="_blank" rel="noopener noreferrer" style="text-decoration: none; display: block; margin-bottom: 12px;">
-<div style="border: 2px solid #e0e0e0; border-radius: 12px; padding: 18px; display: flex; align-items: center; gap: 15px; background: linear-gradient(135deg, #f8f9fa 0%, #f0f4ff 100%);">
-<div style="min-width: 50px; height: 50px; background: {color}; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-<span style="color: white; font-size: 20px; font-weight: bold;">{initial}</span>
-</div>
-<div>
-<div style="font-size: 16px; font-weight: bold; color: #1a1a1a;">{name}</div>
-<div style="font-size: 13px; color: #666; margin-top: 3px;">{desc}</div>
-<div style="font-size: 12px; color: {color}; margin-top: 3px;">{url.replace('https://','').replace('http://','').split('/')[0]} →</div>
-</div>
-</div>
-</a>
-"""
-        cards_html += '</div>'
+            cards_html += f'<a href="{url}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:block;margin-bottom:12px;border:2px solid #e0e0e0;border-radius:12px;padding:18px;background:linear-gradient(135deg,#f8f9fa 0%,#f0f4ff 100%);"><table style="border:none;border-collapse:collapse;width:100%;"><tr><td style="width:50px;border:none;padding:0;vertical-align:middle;"><span style="display:inline-block;width:50px;height:50px;background:{color};border-radius:10px;text-align:center;line-height:50px;color:white;font-size:20px;font-weight:bold;">{initial}</span></td><td style="padding-left:15px;border:none;vertical-align:middle;"><span style="font-size:16px;font-weight:bold;color:#1a1a1a;">{name}</span><br/><span style="font-size:13px;color:#666;">{desc}</span><br/><span style="font-size:12px;color:{color};">{domain} →</span></td></tr></table></a>'
+
+        cards_html += '</td></tr></table>'
         logger.info(f"  ✅ 링크 카드 {len(sites)}개 생성")
         return cards_html
 
