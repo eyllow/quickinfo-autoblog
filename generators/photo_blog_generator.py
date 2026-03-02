@@ -84,6 +84,134 @@ JSON으로만 응답 (다른 텍스트 없이):
         text = result.text.replace("```json", "").replace("```", "").strip()
         return json.loads(text)
 
+    def search_naver_place(self, place_name: str, location: str = "") -> Optional[Dict]:
+        """네이버 플레이스에서 장소 정보 검색"""
+        import requests
+
+        query = f"{location} {place_name}".strip() if location else place_name
+
+        try:
+            # 네이버 검색 API (로컬 검색)
+            headers = {"User-Agent": "Mozilla/5.0"}
+
+            # 네이버 지역 검색 (플레이스)
+            search_url = f"https://search.naver.com/search.naver?where=nexearch&query={requests.utils.quote(query)}"
+            resp = requests.get(search_url, headers=headers, timeout=10)
+
+            if resp.status_code != 200:
+                return None
+
+            html = resp.text
+
+            # 네이버 플레이스 ID 추출
+            import re
+            place_match = re.search(r'place/(\d+)', html)
+            place_id = place_match.group(1) if place_match else None
+
+            # 주소 추출 시도
+            addr_match = re.search(r'"roadAddress":"([^"]+)"', html)
+            address = addr_match.group(1) if addr_match else ""
+
+            # 전화번호 추출
+            tel_match = re.search(r'"tel":"([^"]+)"', html)
+            tel = tel_match.group(1) if tel_match else ""
+
+            # 카테고리 추출
+            cat_match = re.search(r'"category":"([^"]+)"', html)
+            category = cat_match.group(1) if cat_match else ""
+
+            # 영업시간 추출
+            hours_match = re.search(r'"bizHour":\s*"([^"]+)"', html)
+            hours = hours_match.group(1) if hours_match else ""
+
+            if not place_id and not address:
+                # 폴백: Gemini에 검색 요청
+                logger.info(f"Naver place not found via scraping, trying Gemini for: {query}")
+                fallback = self._search_place_via_ai(place_name, location)
+                return fallback
+
+            result = {
+                "name": place_name,
+                "address": address,
+                "tel": tel,
+                "category": category,
+                "hours": hours,
+                "naver_place_url": f"https://map.naver.com/p/entry/place/{place_id}" if place_id else "",
+                "naver_map_url": f"https://map.naver.com/p/search/{requests.utils.quote(query)}",
+            }
+
+            logger.info(f"Naver place found: {place_name} → {address}")
+            return result
+
+        except Exception as e:
+            logger.warning(f"Naver place search failed: {e}")
+            return self._search_place_via_ai(place_name, location)
+
+    def _search_place_via_ai(self, place_name: str, location: str = "") -> Optional[Dict]:
+        """AI로 장소 정보 생성 (폴백)"""
+        try:
+            import requests as _req
+            query = f"{location} {place_name}".strip() if location else place_name
+            prompt = f"""'{place_name}'의 정보를 알려줘. JSON만 출력:
+{{
+  "name": "가게명",
+  "address": "도로명 주소 (모르면 빈 문자열)",
+  "tel": "전화번호 (모르면 빈 문자열)",
+  "category": "업종 (카페/음식점/관광지 등)",
+  "hours": "영업시간 (모르면 빈 문자열)"
+}}"""
+            result = self.model.generate_content(prompt)
+            text = result.text.replace("```json", "").replace("```", "").strip()
+            data = json.loads(text)
+            data["naver_map_url"] = f"https://map.naver.com/p/search/{_req.utils.quote(query)}"
+            data["naver_place_url"] = ""
+            return data
+        except Exception as e:
+            logger.warning(f"AI place search failed: {e}")
+            return None
+
+    def _build_place_info_html(self, place_info: Dict) -> str:
+        """장소 정보를 HTML 카드로 변환"""
+        if not place_info:
+            return ""
+
+        name = place_info.get("name", "")
+        address = place_info.get("address", "")
+        tel = place_info.get("tel", "")
+        hours = place_info.get("hours", "")
+        category = place_info.get("category", "")
+        naver_map = place_info.get("naver_map_url", "")
+        naver_place = place_info.get("naver_place_url", "")
+
+        rows = []
+        if address:
+            rows.append(f'<tr><td style="padding:8px 12px;font-weight:bold;color:#333;white-space:nowrap;">📍 주소</td><td style="padding:8px 12px;color:#555;">{address}</td></tr>')
+        if hours:
+            rows.append(f'<tr><td style="padding:8px 12px;font-weight:bold;color:#333;white-space:nowrap;">🕐 영업시간</td><td style="padding:8px 12px;color:#555;">{hours}</td></tr>')
+        if tel:
+            rows.append(f'<tr><td style="padding:8px 12px;font-weight:bold;color:#333;white-space:nowrap;">📞 전화</td><td style="padding:8px 12px;color:#555;">{tel}</td></tr>')
+        if category:
+            rows.append(f'<tr><td style="padding:8px 12px;font-weight:bold;color:#333;white-space:nowrap;">🏷️ 업종</td><td style="padding:8px 12px;color:#555;">{category}</td></tr>')
+
+        map_link = ""
+        if naver_place:
+            map_link = f'<a href="{naver_place}" target="_blank" rel="noopener" style="display:inline-block;margin:10px 5px 0;padding:10px 20px;background:#03C75A;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;">📍 네이버 플레이스</a>'
+        if naver_map:
+            map_link += f'<a href="{naver_map}" target="_blank" rel="noopener" style="display:inline-block;margin:10px 5px 0;padding:10px 20px;background:#1EC800;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;">🗺️ 네이버 지도</a>'
+
+        html = f'''
+<div style="margin:40px 0 20px;padding:24px;background:#f8f9fa;border-radius:12px;border:1px solid #e9ecef;">
+  <h3 style="margin:0 0 16px;font-size:18px;color:#222;">📌 {name} 방문 정보</h3>
+  <table style="width:100%;border-collapse:collapse;">
+    {"".join(rows)}
+  </table>
+  <div style="text-align:center;margin-top:12px;">
+    {map_link}
+  </div>
+</div>
+'''
+        return html
+
     def search_reference_blogs(self, keyword: str, count: int = 5) -> List[Dict]:
         """네이버 블로그에서 참조 블로그 수집"""
         references = []
@@ -270,8 +398,22 @@ JSON으로만 응답 (다른 텍스트 없이):
             if not uploaded_photos:
                 return PhotoBlogResult(success=False, error="사진 업로드 실패")
 
+            # 3.5. 장소 정보 검색 (네이버 플레이스)
+            place_info = None
+            place_name = keywords.get("place_name", "")
+            if place_name:
+                print(f"\n[3.5/6] 네이버 플레이스 검색: {place_name}")
+                place_info = self.search_naver_place(
+                    place_name, keywords.get("location", "")
+                )
+                if place_info:
+                    print(f"  주소: {place_info.get('address', '-')}")
+                    print(f"  전화: {place_info.get('tel', '-')}")
+                else:
+                    print(f"  ⚠️ 장소 정보 없음")
+
             # 4. 글 생성
-            print(f"\n[4/5] AI 글 생성 중...")
+            print(f"\n[4/6] AI 글 생성 중...")
             blog_data = self.generate_blog_content(
                 memo=request.memo,
                 keywords=keywords,
@@ -281,8 +423,14 @@ JSON으로만 응답 (다른 텍스트 없이):
             print(f"  제목: {blog_data['title']}")
             print(f"  본문: {len(blog_data.get('content', ''))}자")
 
+            # 4.5. 장소 정보 카드 삽입
+            if place_info:
+                place_html = self._build_place_info_html(place_info)
+                blog_data["content"] += place_html
+                print(f"  📍 장소 정보 카드 삽입 완료")
+
             # 5. 발행
-            print(f"\n[5/5] 워드프레스 발행 중...")
+            print(f"\n[5/6] 워드프레스 발행 중...")
 
             # 카테고리 매핑
             category_map = {
