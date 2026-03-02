@@ -23,8 +23,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 try:
-    import anthropic
+    import google.generativeai as genai
     from config.settings import settings
+    HAS_GEMINI = True
+except ImportError:
+    HAS_GEMINI = False
+
+# Legacy Claude support (deprecated - now using Gemini)
+try:
+    import anthropic
     HAS_CLAUDE = True
 except ImportError:
     HAS_CLAUDE = False
@@ -66,15 +73,18 @@ class BlogReferenceCrawler:
         self.session = requests.Session()
         self.session.headers.update(HEADERS)
 
-        # Claude 클라이언트 초기화
-        if HAS_CLAUDE:
+        # Gemini 클라이언트 초기화 (Claude에서 전환)
+        self.gemini_model = None
+        if HAS_GEMINI:
             try:
-                self.claude_client = anthropic.Anthropic(api_key=settings.claude_api_key)
+                genai.configure(api_key=settings.gemini_api_key)
+                self.gemini_model = genai.GenerativeModel(settings.gemini_model or "gemini-2.0-flash")
+                logger.info("BlogReference: Gemini 초기화 성공")
             except Exception as e:
-                logger.warning(f"Claude client initialization failed: {e}")
-                self.claude_client = None
-        else:
-            self.claude_client = None
+                logger.warning(f"Gemini initialization failed: {e}")
+
+        # Legacy (사용 안 함)
+        self.claude_client = None
 
     def search_naver_blogs(self, keyword: str, count: int = 5) -> List[str]:
         """
@@ -373,7 +383,7 @@ class BlogReferenceCrawler:
         Returns:
             AI 요약 결과
         """
-        if not self.claude_client or not text:
+        if not self.gemini_model or not text:
             return ""
 
         try:
@@ -389,13 +399,15 @@ class BlogReferenceCrawler:
 
 200자 이내 요약:"""
 
-            response = self.claude_client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=300,
-                messages=[{"role": "user", "content": prompt}]
+            response = self.gemini_model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=300,
+                    temperature=0.3,
+                ),
             )
 
-            return response.content[0].text.strip()
+            return response.text.strip()
 
         except Exception as e:
             logger.warning(f"AI summarization failed: {e}")
@@ -478,7 +490,7 @@ class BlogReferenceCrawler:
                 lines.append(f"  글 스타일: {a.tone} ({a.structure_pattern})")
 
             # AI 요약 (상위 2개만)
-            if i <= 2 and a.full_text and self.claude_client:
+            if i <= 2 and a.full_text and self.gemini_model:
                 summary = self.summarize_with_ai(a.full_text, keyword)
                 if summary:
                     lines.append(f"  핵심 요약: {summary}")
