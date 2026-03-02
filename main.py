@@ -272,6 +272,14 @@ def process_keyword(
                 wp_url=result.url
             )
             logger.info(f"Successfully published: {result.url}")
+
+            # 5. Google Indexing API 색인 요청
+            try:
+                from utils.google_indexing import request_indexing
+                request_indexing(result.url)
+            except Exception as e:
+                logger.warning(f"Google Indexing request failed: {e}")
+
             return True
         else:
             logger.error(f"Failed to publish: {result.error}")

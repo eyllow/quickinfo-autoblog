@@ -552,6 +552,14 @@ JSON으로만 응답 (다른 텍스트 없이):
                 post_id = post_result.post_id or 0
                 print(f"\n✅ 발행 완료!")
                 print(f"  URL: {post_url}")
+
+                # Google Indexing API 색인 요청
+                try:
+                    from utils.google_indexing import request_indexing
+                    request_indexing(post_url)
+                except Exception as e:
+                    logger.warning(f"Google Indexing request failed: {e}")
+
                 print(f"{'='*50}\n")
 
                 return PhotoBlogResult(
