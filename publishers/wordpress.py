@@ -384,8 +384,8 @@ class WordPressPublisher:
             if tag_ids:
                 post_data["tags"] = tag_ids
             # Featured Image 제거 - 본문 이미지와 중복 방지
-            # if featured_media_id:
-            #     post_data["featured_media"] = featured_media_id
+            if featured_media_id:
+                post_data["featured_media"] = featured_media_id
             if excerpt:
                 post_data["excerpt"] = excerpt
 
