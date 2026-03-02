@@ -474,9 +474,26 @@ def limit_emojis(content: str, max_emojis: int = 2) -> str:
     return result
 
 
+def clean_markdown_artifacts(content: str) -> str:
+    """마크다운 아티팩트 제거 (**, ##, ``` 등이 HTML 본문에 남아있는 경우)"""
+    import re as _re
+    # **텍스트** → <strong>텍스트</strong> (HTML 태그 안이 아닌 경우만)
+    result = _re.sub(r'(?<![<>])\*\*([^*]+)\*\*', r'<strong>\1</strong>', content)
+    # *텍스트* → <em>텍스트</em>
+    result = _re.sub(r'(?<![<>*])\*([^*]+)\*(?!\*)', r'<em>\1</em>', result)
+    # 남은 ** 제거
+    result = result.replace('**', '')
+    # ## 헤딩 마크다운 제거
+    result = _re.sub(r'^#{1,6}\s+', '', result, flags=_re.MULTILINE)
+    # ``` 코드블록 마커 제거
+    result = _re.sub(r'```\w*\n?', '', result)
+    return result
+
+
 def post_process_content(content: str) -> str:
     """콘텐츠 후처리 통합 함수"""
     result = clean_ai_content(content)
+    result = clean_markdown_artifacts(result)
     result = limit_emojis(result, max_emojis=2)
     return result
 

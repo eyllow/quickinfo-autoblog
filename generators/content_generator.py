@@ -494,6 +494,8 @@ class ContentGenerator:
         # 제목 생성에는 페르소나 미사용
         title = self._call_ai(prompt, max_tokens=200, use_persona=False)
         title = title.strip().strip('"\'')
+        # 마크다운 ** 제거
+        title = title.replace('**', '')
         
         # Gemini 제목 잘림 보정: 제목이 너무 짧으면 키워드 기반 재생성
         if len(title) < 15:
@@ -512,9 +514,11 @@ class ContentGenerator:
 제목만 한 줄로 출력하세요."""
             title = self._call_ai(fallback_prompt, max_tokens=100, use_persona=False)
             title = title.strip().strip('"\'')
-            # 여전히 짧으면 키워드 + 연도 기반 제목
+            # 여전히 짧으면 키워드 + 간결한 제목
             if len(title) < 15:
-                title = f"{keyword} {_year}년 핵심 정리와 실전 활용법"
+                _suffixes = ["쉽게 정리한 핵심 포인트", "이것만 알면 충분합니다", "실전 활용 꿀팁", "한눈에 보는 핵심 정리"]
+                import random as _rand
+                title = f"{keyword}, {_rand.choice(_suffixes)}"
         
         # 제목 중복 단어 제거 (예: "총정리 총정리" → "총정리")
         import re as _re
