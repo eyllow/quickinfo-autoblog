@@ -67,6 +67,27 @@ def clean_html_styles(html_content: str) -> str:
     Returns:
         정리된 HTML 콘텐츠
     """
+    # AI 생성 잔여 태그/플레이스홀더 제거 (본문에 노출 방지)
+    placeholder_patterns = [
+        r'\[OFFICIAL_LINK\]',
+        r'\[COUPANG\]',
+        r'\[AFFILIATE_NOTICE\]',
+        r'\[META\].*?\[/META\]',
+        r'\[IMAGE\d*\]',
+        r'\[AD\]',
+        r'\[LINK\]',
+        r'\[CTA\]',
+        r'\[BANNER\]',
+        r'\[SPONSORED\]',
+        r'\[SOURCE\]',
+        r'\[REF\]',
+    ]
+    for pattern in placeholder_patterns:
+        html_content = re.sub(pattern, '', html_content, flags=re.DOTALL | re.IGNORECASE)
+
+    # 태그 제거 후 빈 p 태그 정리
+    html_content = re.sub(r'<p>\s*</p>', '', html_content)
+
     # blockquote 태그를 일반 div로 변환
     html_content = re.sub(
         r'<blockquote[^>]*>',
