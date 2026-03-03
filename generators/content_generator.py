@@ -686,7 +686,12 @@ class ContentGenerator:
         content = clean_ai_response(content)
 
         # 본문 시작의 대제목 제거 (WP 테마가 별도로 제목 표시하므로 중복)
+        # Case 1: 중앙 정렬 h2
         content = re.sub(r'^\s*<h2[^>]*style="[^"]*text-align:\s*center[^"]*"[^>]*>.*?</h2>\s*', '', content, count=1, flags=re.DOTALL)
+        # Case 2: 본문 시작 일반 h2 (첫 태그가 h2이면 제거)
+        content = re.sub(r'^\s*<h2[^>]*>.*?</h2>\s*', '', content, count=1, flags=re.DOTALL)
+        # Case 3: 본문 시작 blockquote (인용 형태 부제목 제거)
+        content = re.sub(r'^\s*<blockquote[^>]*>\s*<p[^>]*>.*?</p>\s*</blockquote>\s*', '', content, count=1, flags=re.DOTALL)
 
         # placeholder 이미지 제거
         content = re.sub(r'<p[^>]*>\s*<img[^>]*src="https://via\.placeholder\.com[^"]*"[^>]*/?\s*>\s*</p>', '', content, flags=re.DOTALL)
@@ -714,11 +719,28 @@ class ContentGenerator:
         return content.strip(), sources, template_info_dict
 
     def _extract_meta_description(self, content: str) -> str:
-        """메타 설명 추출"""
+        """메타 설명 추출 (폴백: 본문 첫 문단)"""
+        # 1. [META] 태그에서 추출
         match = re.search(r'\[META\](.*?)\[/META\]', content, flags=re.DOTALL)
         if match:
-            return match.group(1).strip()[:160]
-        return ""
+            desc = match.group(1).strip()[:160]
+            if len(desc) > 30:
+                return desc
+
+        # 2. 폴백: 본문에서 첫 번째 <p> 태그 내용 추출
+        p_match = re.search(r'<p[^>]*>(.*?)</p>', content, flags=re.DOTALL)
+        if p_match:
+            text = re.sub(r'<[^>]+>', '', p_match.group(1)).strip()
+            if len(text) > 30:
+                return text[:160]
+
+        # 3. 폴백: HTML 태그 제거 후 첫 200자
+        plain = re.sub(r'<[^>]+>', '', content).strip()
+        # 첫 문장 또는 150자
+        sentences = plain.split('.')
+        if sentences and len(sentences[0]) > 20:
+            return (sentences[0] + '.').strip()[:160]
+        return plain[:160] if len(plain) > 30 else ""
 
     def get_official_link(self, keyword: str) -> Optional[dict]:
         """공식 사이트 링크 찾기"""
@@ -1298,7 +1320,31 @@ class ContentGenerator:
             logger.warning(f"Blog reference failed: {e}")
             print(f"  ⚠️ 블로그 참조 실패: {e}")
 
-        # Step 2.5b: 성과 학습 — 과거 데이터 기반 콘텐츠 추천
+        # Step 2.5b: 블로그 학습 + 성과 데이터 기반 강화 프롬프트 주입
+        try:
+            from utils.performance_tracker import get_enhanced_prompt_injection
+            enhanced_prompt = get_enhanced_prompt_injection(category_name)
+            if enhanced_prompt:
+                if not trend_context:
+                    trend_context = ""
+                trend_context += enhanced_prompt
+                print(f"  📚 강화 프롬프트 주입: {category_name} (학습DB + 성과데이터)")
+        except Exception as e:
+            logger.warning(f"Enhanced prompt injection failed: {e}")
+            # 폴백: 기존 blog_learner만 사용
+            try:
+                from utils.blog_learner import BlogLearner
+                blog_learner = BlogLearner()
+                learned_prompt = blog_learner.get_prompt_injection(category_name)
+                if learned_prompt:
+                    if not trend_context:
+                        trend_context = ""
+                    trend_context += learned_prompt
+                    print(f"  📚 학습 DB 패턴 주입: {category_name} (폴백)")
+            except Exception as e2:
+                logger.warning(f"Blog learner fallback failed: {e2}")
+
+        # Step 2.5c: 성과 학습 — 과거 데이터 기반 콘텐츠 추천
         performance_rec = None
         try:
             from utils.performance_learner import performance_learner

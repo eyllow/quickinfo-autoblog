@@ -22,7 +22,7 @@ import requests
 from pathlib import Path
 from datetime import datetime
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,7 @@ from config.settings import settings
 from generators.content_generator import ContentGenerator, clean_html_styles
 from publishers.wordpress import WordPressPublisher
 from database.models import Database
+from utils.image_fetcher import ImageFetcher
 
 WP_AUTH = (settings.wp_user, settings.wp_app_password)
 
@@ -81,51 +82,104 @@ def search_reference_blogs(keyword: str) -> str:
 # Step 3: 관련 링크 카드 생성 (Gemini)
 # ============================================================
 def generate_link_cards(keyword: str, ref_text: str) -> str:
-    """키워드 관련 공식 사이트 링크 카드 HTML 생성"""
+    """키워드 관련 공식 사이트 링크 카드 HTML 생성 (폴백 포함)"""
+
+    # 주요 키워드별 기본 공식 사이트 (Gemini 실패 시 폴백)
+    FALLBACK_SITES = {
+        "청년도약계좌": [
+            {"name": "서민금융진흥원", "url": "https://www.kinfa.or.kr", "desc": "청년도약계좌 공식 운영기관", "color": "#1a73e8", "initial": "서"},
+            {"name": "청년정책", "url": "https://www.youthcenter.go.kr", "desc": "청년 지원 정책 종합 포털", "color": "#00897b", "initial": "청"},
+        ],
+        "근로장려금": [
+            {"name": "국세청 홈택스", "url": "https://www.hometax.go.kr", "desc": "근로장려금 신청 공식 사이트", "color": "#0d47a1", "initial": "국"},
+            {"name": "정부24", "url": "https://www.gov.kr", "desc": "정부 서비스 통합 포털", "color": "#1565c0", "initial": "정"},
+        ],
+        "연말정산": [
+            {"name": "국세청 홈택스", "url": "https://www.hometax.go.kr", "desc": "연말정산 간소화 서비스", "color": "#0d47a1", "initial": "국"},
+            {"name": "국세청", "url": "https://www.nts.go.kr", "desc": "세금 관련 공식 안내", "color": "#1a237e", "initial": "세"},
+        ],
+        "주택청약": [
+            {"name": "청약홈", "url": "https://www.applyhome.co.kr", "desc": "주택청약 공식 사이트", "color": "#1565c0", "initial": "청"},
+            {"name": "LH 한국토지주택공사", "url": "https://www.lh.or.kr", "desc": "공공주택 정보", "color": "#00695c", "initial": "LH"},
+        ],
+        "전기차": [
+            {"name": "환경부", "url": "https://www.me.go.kr", "desc": "전기차 보조금 정책 안내", "color": "#2e7d32", "initial": "환"},
+            {"name": "저공해차 통합누리집", "url": "https://www.ev.or.kr", "desc": "전기차 구매 지원 정보", "color": "#1b5e20", "initial": "저"},
+        ],
+        "건강보험": [
+            {"name": "국민건강보험공단", "url": "https://www.nhis.or.kr", "desc": "건강보험 공식 사이트", "color": "#0277bd", "initial": "건"},
+        ],
+        "국민연금": [
+            {"name": "국민연금공단", "url": "https://www.nps.or.kr", "desc": "국민연금 공식 사이트", "color": "#00838f", "initial": "연"},
+        ],
+        "실업급여": [
+            {"name": "고용보험", "url": "https://www.ei.go.kr", "desc": "실업급여 신청 공식 사이트", "color": "#0d47a1", "initial": "고"},
+            {"name": "워크넷", "url": "https://www.work.go.kr", "desc": "취업 지원 포털", "color": "#1565c0", "initial": "워"},
+        ],
+        "여행": [
+            {"name": "대한민국 구석구석", "url": "https://korean.visitkorea.or.kr", "desc": "국내 여행 정보 공식 사이트", "color": "#e91e63", "initial": "한"},
+        ],
+    }
+
+    def build_card_html(sites):
+        if not sites:
+            return ""
+        html = '<div style="margin: 30px 0; padding: 20px; background: linear-gradient(135deg, #f8f9fa 0%, #e8f4fd 100%); border-radius: 16px;">'
+        html += '<h3 style="margin: 0 0 20px 0; font-size: 18px; color: #1a1a1a;">&#128204; 관련 사이트 바로가기</h3>'
+        for site in sites[:4]:
+            domain = site["url"].replace("https://", "").replace("http://", "").split("/")[0]
+            html += f'<a href="{site["url"]}" target="_blank" rel="noopener noreferrer" style="display: block; text-decoration: none; margin-bottom: 12px; padding: 16px; background: white; border-radius: 12px; border: 1px solid #e0e0e0;">'
+            html += '<div style="display: flex; align-items: center;">'
+            html += f'<div style="width: 48px; height: 48px; background: {site["color"]}; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; font-weight: bold; flex-shrink: 0;">{site["initial"]}</div>'
+            html += '<div style="margin-left: 16px; flex: 1;">'
+            html += f'<div style="font-size: 16px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px;">{site["name"]}</div>'
+            html += f'<div style="font-size: 13px; color: #666;">{site["desc"]}</div>'
+            html += f'<div style="font-size: 12px; color: {site["color"]}; margin-top: 4px;">{domain} &rarr;</div>'
+            html += '</div></div></a>'
+        html += '</div>'
+        return html
+
+    # 1. 키워드 매칭으로 폴백 사이트 확인
+    fallback_sites = None
+    for key, sites in FALLBACK_SITES.items():
+        if key in keyword:
+            fallback_sites = sites
+            break
+
+    # 2. Gemini로 생성 시도
     try:
         import google.generativeai as genai
         genai.configure(api_key=os.environ.get("GOOGLE_API_KEY", ""))
         model = genai.GenerativeModel("gemini-2.0-flash")
 
-        prompt = f"""다음 키워드와 관련된 공식/유용한 사이트 2~4개를 추천해줘.
-정부 사이트, 공식 홈페이지, 신청 사이트 등 신뢰할 수 있는 사이트만.
+        prompt = f"""다음 키워드에 대해 가장 유용한 공식 사이트 3~4개를 추천해줘.
+반드시 실제 존재하는 공식 사이트만 추천하고, 정부/공공기관 사이트를 우선해줘.
 
 키워드: {keyword}
 참고 내용: {ref_text[:1000]}
 
-JSON 배열로만 응답. 다른 텍스트 없이:
-[
-  {{"name": "사이트명", "url": "https://...", "desc": "한줄 설명", "color": "#1a73e8", "initial": "K"}}
-]"""
+JSON 배열로만 응답:
+[{{"name": "사이트명", "url": "https://...", "desc": "설명 20자", "color": "#1a73e8", "initial": "첫글자"}}]"""
 
         resp = model.generate_content(prompt)
         text = resp.text.strip()
-        # JSON 추출
-        json_match = re.search(r'\[[\s\S]*\]', text)
+        json_match = re.search(r'\[.*\]', text, re.DOTALL)
         if json_match:
             sites = json.loads(json_match.group())
-        else:
-            return ""
-
-        # HTML 카드 생성 — WP 호환 (div 대신 span, wpautop 우회)
-        cards_html = '<table style="border:none;border-collapse:collapse;width:100%;margin:0 0 30px 0;"><tr><td style="border:none;padding:0;"><h3 style="margin-bottom:15px;">📌 관련 사이트 바로가기</h3>'
-        for site in sites[:4]:
-            name = site.get("name", "")
-            url = site.get("url", "")
-            desc = site.get("desc", "")
-            color = site.get("color", "#1a73e8")
-            initial = site.get("initial", name[0] if name else "?")
-            domain = url.replace('https://','').replace('http://','').split('/')[0]
-
-            cards_html += f'<a href="{url}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:block;margin-bottom:12px;border:2px solid #e0e0e0;border-radius:12px;padding:18px;background:linear-gradient(135deg,#f8f9fa 0%,#f0f4ff 100%);"><table style="border:none;border-collapse:collapse;width:100%;"><tr><td style="width:50px;border:none;padding:0;vertical-align:middle;"><span style="display:inline-block;width:50px;height:50px;background:{color};border-radius:10px;text-align:center;line-height:50px;color:white;font-size:20px;font-weight:bold;">{initial}</span></td><td style="padding-left:15px;border:none;vertical-align:middle;"><span style="font-size:16px;font-weight:bold;color:#1a1a1a;">{name}</span><br/><span style="font-size:13px;color:#666;">{desc}</span><br/><span style="font-size:12px;color:{color};">{domain} →</span></td></tr></table></a>'
-
-        cards_html += '</td></tr></table>'
-        logger.info(f"  ✅ 링크 카드 {len(sites)}개 생성")
-        return cards_html
+            if sites:
+                logger.info(f"  ✅ 링크 카드 {len(sites)}개 생성 (Gemini)")
+                return build_card_html(sites)
 
     except Exception as e:
-        logger.warning(f"  ⚠️ 링크 카드 생성 실패: {e}")
-        return ""
+        logger.warning(f"  ⚠️ Gemini 링크 카드 실패: {e}")
+
+    # 3. 폴백 사용
+    if fallback_sites:
+        logger.info(f"  ✅ 링크 카드 {len(fallback_sites)}개 생성 (폴백)")
+        return build_card_html(fallback_sites)
+
+    logger.warning(f"  ⚠️ 링크 카드 없음")
+    return ""
 
 
 # ============================================================
@@ -330,6 +384,31 @@ def manual_publish(keyword: str, ref_url: str = "") -> dict:
     wp = WordPressPublisher()
     db = Database()
 
+    # Step 0: 중복 발행 체크
+    logger.info("[0/7] 중복 발행 체크...")
+    from utils.dedup_checker import check_duplicate
+    is_dup, dup_info = check_duplicate(
+        keyword=keyword,
+        wp_url=settings.wp_url,
+        wp_user=settings.wp_user,
+        wp_pass=settings.wp_app_password,
+        db=db,
+        threshold=0.6,
+        days=30
+    )
+    if is_dup:
+        logger.warning(f"  ⚠️ 중복 발견! 유사도: {dup_info['similarity']}")
+        logger.warning(f"  📌 기존 글: {dup_info.get('title', dup_info.get('keyword', ''))[:60]}")
+        logger.warning(f"  🔗 URL: {dup_info.get('url', 'N/A')}")
+        logger.warning(f"  📅 날짜: {dup_info.get('date', 'N/A')}")
+        if "--force" not in sys.argv:
+            logger.info("  ❌ 중복 방지: 발행 중단 (--force로 강제 발행 가능)")
+            return None
+        else:
+            logger.info("  ⚡ --force: 강제 발행 진행")
+    else:
+        logger.info("  ✅ 중복 없음 — 발행 진행")
+
     # Step 1: 참조 URL 팩트 수집
     logger.info("[1/7] 참조 URL 팩트 수집...")
     ref_text = fetch_reference_url(ref_url) if ref_url else ""
@@ -388,7 +467,30 @@ def manual_publish(keyword: str, ref_url: str = "") -> dict:
     logger.info(f"  ✅ 제목: {title}")
     logger.info(f"  ✅ 본문: {len(html_content)}자")
 
-    # Step 4: 정보 카드 생성
+    # Step 3.5: 스마트 이미지 삽입
+    logger.info("[3.5/7] 스마트 이미지 삽입...")
+    try:
+        from utils.smart_image_inserter import smart_insert_images
+
+        html_content, img_count, featured_id = smart_insert_images(
+            content=html_content,
+            keyword=keyword,
+            category="트렌드",  # TODO: 카테고리 자동 감지
+            pexels_key=settings.pexels_api_key,
+            wp_url=settings.wp_url,
+            wp_auth=(settings.wp_user, settings.wp_app_password)
+        )
+
+        if img_count > 0:
+            logger.info(f"  ✅ 이미지 {img_count}개 삽입 (각각 다른 이미지, 소제목 연관)")
+        else:
+            logger.info("  ℹ️ 이미지 삽입 불필요 또는 실패")
+
+    except Exception as e:
+        logger.warning(f"  ⚠️ 이미지 삽입 실패: {e}")
+        featured_id = None
+
+        # Step 4: 정보 카드 생성
     logger.info("[4/7] 정보 카드 생성...")
     combined_ref = ref_text + "\n" + blog_analysis
     info_card_html = generate_info_card(keyword, combined_ref)

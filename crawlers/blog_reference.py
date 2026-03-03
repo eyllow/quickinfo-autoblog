@@ -38,14 +38,26 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                  "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
-    "Referer": "https://www.naver.com/",
-    "Connection": "keep-alive",
-}
+import random
+
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+]
+
+def _get_headers():
+    return {
+        "User-Agent": random.choice(USER_AGENTS),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
+        "Referer": "https://www.naver.com/",
+        "Connection": "keep-alive",
+    }
+
+HEADERS = _get_headers()
 
 
 @dataclass
@@ -64,6 +76,11 @@ class BlogAnalysis:
     key_sentences: List[str] = field(default_factory=list)
     numbers_data: List[str] = field(default_factory=list)  # 수치/데이터
     structure_pattern: str = ""  # 도입-본론-결론 등
+    image_count: int = 0  # 본문 이미지 수
+    intro_pattern: str = ""  # 도입부 패턴: question/statistic/story/direct
+    has_table: bool = False  # 표 포함 여부
+    has_list: bool = False  # 리스트(ul/ol) 포함 여부
+    source: str = ""  # naver/tistory/brunch
 
 
 class BlogReferenceCrawler:
@@ -71,7 +88,7 @@ class BlogReferenceCrawler:
 
     def __init__(self):
         self.session = requests.Session()
-        self.session.headers.update(HEADERS)
+        # UA 로테이션: 각 요청에서 _get_headers() 사용
 
         # Gemini 클라이언트 초기화 (Claude에서 전환)
         self.gemini_model = None
@@ -102,7 +119,7 @@ class BlogReferenceCrawler:
                 f"https://search.naver.com/search.naver?"
                 f"where=blog&query={quote(keyword)}&sm=tab_opt&sort=sim"
             )
-            resp = self.session.get(url, timeout=10)
+            resp = self.session.get(url, headers=_get_headers(), timeout=10)
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, "html.parser")
 
@@ -193,18 +210,35 @@ class BlogReferenceCrawler:
         analysis = BlogAnalysis(url=url)
 
         try:
-            resp = self.session.get(url, timeout=15)
+            resp = self.session.get(url, headers=_get_headers(), timeout=15)
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, "html.parser")
 
-            # iframe 내부 콘텐츠 (네이버 블로그 구조)
+            # 네이버 블로그: PC → 모바일 URL 변환 (iframe 우회)
+            if "blog.naver.com" in url and "m.blog" not in url:
+                mobile_url = url.replace("blog.naver.com", "m.blog.naver.com")
+                try:
+                    resp_m = self.session.get(mobile_url, headers=_get_headers(), timeout=15)
+                    resp_m.raise_for_status()
+                    soup = BeautifulSoup(resp_m.text, "html.parser")
+                    analysis.source = "naver"
+                except Exception:
+                    pass  # 폴백: PC 버전 계속 사용
+            elif "m.blog.naver.com" in url:
+                analysis.source = "naver"
+            elif "tistory.com" in url:
+                analysis.source = "tistory"
+            elif "brunch.co.kr" in url:
+                analysis.source = "brunch"
+
+            # 폴백: 기존 iframe 방식
             iframe = soup.select_one("iframe#mainFrame")
             if iframe:
                 iframe_src = iframe.get("src", "")
                 if iframe_src:
                     if iframe_src.startswith("/"):
                         iframe_src = "https://blog.naver.com" + iframe_src
-                    resp2 = self.session.get(iframe_src, timeout=15)
+                    resp2 = self.session.get(iframe_src, headers=_get_headers(), timeout=15)
                     resp2.raise_for_status()
                     soup = BeautifulSoup(resp2.text, "html.parser")
 
@@ -282,6 +316,31 @@ class BlogReferenceCrawler:
 
             # 구조 패턴 분석
             analysis.structure_pattern = self._analyze_structure(headings, full_text)
+
+            # 이미지 수 분석
+            images = content_area.select("img")
+            analysis.image_count = len([
+                img for img in images
+                if img.get("src", "").startswith("http")
+                and "icon" not in img.get("src", "").lower()
+                and "logo" not in img.get("src", "").lower()
+                and "profile" not in img.get("src", "").lower()
+            ])
+
+            # 테이블/리스트 포함 여부
+            analysis.has_table = bool(content_area.select("table"))
+            analysis.has_list = bool(content_area.select("ul, ol"))
+
+            # 도입부 패턴 분석 (처음 200자)
+            intro = full_text[:200]
+            if re.search(r'\?|할까|일까|인가|인지|는지', intro):
+                analysis.intro_pattern = "question"
+            elif re.search(r'\d+%|\d+만|\d+억|\d+명|통계|조사|연구', intro):
+                analysis.intro_pattern = "statistic"
+            elif re.search(r'저는|제가|나는|나도|어느 날|작년|올해', intro):
+                analysis.intro_pattern = "story"
+            else:
+                analysis.intro_pattern = "direct"
 
             # 품질 점수 계산 (공감/댓글 추출 시도)
             try:
@@ -463,13 +522,42 @@ class BlogReferenceCrawler:
         lines = []
         lines.append(f"=== 상위 {len(analyses)}개 블로그 심층 분석 ===\n")
 
-        # 공통 패턴 정보
+        # 공통 패턴 정보 (강화)
         if common_analysis:
-            lines.append("[공통 패턴]")
+            lines.append("[공통 패턴 — 이 패턴을 반드시 참고하세요]")
             lines.append(f"  - 평균 글 길이: 약 {common_analysis['avg_length']}자")
             lines.append(f"  - 평균 소제목 수: {common_analysis['avg_headings']}개")
             lines.append(f"  - 주요 톤: {common_analysis['dominant_tone']}")
             lines.append(f"  - 공통 키워드: {', '.join(common_analysis['common_keywords'][:10])}")
+
+            # 이미지 평균
+            img_counts = [a.image_count for a in analyses if a.image_count > 0]
+            if img_counts:
+                lines.append(f"  - 평균 이미지 수: {sum(img_counts) // len(img_counts)}개")
+
+            # 도입부 패턴
+            intro_patterns = [a.intro_pattern for a in analyses if a.intro_pattern]
+            if intro_patterns:
+                from collections import Counter
+                most_common_intro = Counter(intro_patterns).most_common(1)[0][0]
+                intro_names = {"question": "질문형", "statistic": "통계/수치형", "story": "스토리텔링형", "direct": "직접 설명형"}
+                lines.append(f"  - 주요 도입부 패턴: {intro_names.get(most_common_intro, most_common_intro)}")
+
+            # 표/리스트 사용
+            table_count = sum(1 for a in analyses if a.has_table)
+            list_count = sum(1 for a in analyses if a.has_list)
+            if table_count or list_count:
+                lines.append(f"  - 표 사용: {table_count}/{len(analyses)}개 블로그, 리스트 사용: {list_count}/{len(analyses)}개 블로그")
+
+            lines.append("")
+            lines.append("[⚡ 콘텐츠 생성 지시사항]")
+            lines.append(f"  위 분석을 바탕으로:")
+            lines.append(f"  1. 글 길이 {common_analysis['avg_length']}자 이상 작성")
+            lines.append(f"  2. 소제목 {common_analysis['avg_headings']}개 이상 사용")
+            lines.append(f"  3. 상위 블로그의 소제목 흐름과 유사한 구조")
+            lines.append(f"  4. 공통 키워드 자연스럽게 포함")
+            if img_counts:
+                lines.append(f"  5. 이미지 {sum(img_counts) // len(img_counts)}개 이상 삽입 위치 [IMAGE_N] 표시")
             lines.append("")
 
         # 개별 블로그 분석
@@ -488,6 +576,19 @@ class BlogReferenceCrawler:
 
             if a.tone:
                 lines.append(f"  글 스타일: {a.tone} ({a.structure_pattern})")
+
+            if a.image_count > 0:
+                lines.append(f"  이미지: {a.image_count}개")
+
+            intro_names = {"question": "질문형", "statistic": "통계/수치형", "story": "스토리텔링형", "direct": "직접 설명형"}
+            if a.intro_pattern:
+                lines.append(f"  도입부: {intro_names.get(a.intro_pattern, a.intro_pattern)}")
+
+            extras = []
+            if a.has_table: extras.append("표")
+            if a.has_list: extras.append("리스트")
+            if extras:
+                lines.append(f"  포맷: {', '.join(extras)} 사용")
 
             # AI 요약 (상위 2개만)
             if i <= 2 and a.full_text and self.gemini_model:
@@ -576,6 +677,11 @@ class BlogReferenceCrawler:
                 "quality_score": a.quality_score,
                 "likes": a.likes,
                 "comments": a.comments,
+                "image_count": a.image_count,
+                "intro_pattern": a.intro_pattern,
+                "has_table": a.has_table,
+                "has_list": a.has_list,
+                "source": a.source,
             })
 
         return {

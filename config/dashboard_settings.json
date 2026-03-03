@@ -1,0 +1,13 @@
+{
+  "publish_mode": "semi",
+  "auto_schedule": [
+    "09:00",
+    "15:00",
+    "21:00"
+  ],
+  "daily_limit": 5,
+  "keyword_source": "both",
+  "image_preference": "pexels",
+  "content_length": "medium",
+  "auto_publish_enabled": false
+}

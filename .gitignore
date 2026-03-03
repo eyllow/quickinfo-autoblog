@@ -39,3 +39,5 @@ package-lock.json
 
 # Temp files
 temp_screenshots/
+config/google-indexing-key.json
+config/google_credentials.json

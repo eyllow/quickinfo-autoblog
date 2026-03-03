@@ -235,19 +235,22 @@ def process_keyword(
             logger.info("=== DRY RUN END ===")
             return True
 
-        # 2.5. 발행 직전 최종 중복 체크
+        # 2.5. 발행 직전 최종 중복 체크 (토큰 기반 강화)
         try:
-            recent = wp_publisher.get_recent_post_titles(days=14)
-            for rt, rs in recent:
-                rt_lower = rt.lower().strip()
-                title_lower = post.title.lower().strip()
-                kw_lower = keyword.lower().strip()
-                # 제목이 80% 이상 겹치거나 키워드가 최근 제목에 포함
-                if (kw_lower in rt_lower) or (title_lower in rt_lower) or (rt_lower in title_lower):
-                    logger.warning(f"DUPLICATE BLOCKED at publish time: '{post.title}' ~ '{rt}'")
-                    return False
+            is_dup, dup_info = check_duplicate(
+                keyword=keyword,
+                wp_url=wp_publisher.site_url,
+                wp_user=wp_publisher.username,
+                wp_pass=wp_publisher.app_password,
+                db=db,
+                threshold=0.6,
+                days=30
+            )
+            if is_dup:
+                logger.warning(f"DUPLICATE BLOCKED: '{keyword}' ~ '{dup_info.get('title', '')}' (sim={dup_info['similarity']})")
+                return False
         except Exception as e:
-            logger.warning(f"Pre-publish dedup check failed: {e}")
+            logger.warning(f"Dedup check failed: {e}")
 
         # 3. 워드프레스에 발행
         logger.info(f"Step 3: Publishing to WordPress (status: {status})...")
@@ -272,6 +275,24 @@ def process_keyword(
                 wp_url=result.url
             )
             logger.info(f"Successfully published: {result.url}")
+
+            # 4.5. 성과 추적 등록
+            try:
+                from utils.performance_tracker import PerformanceTracker
+                tracker = PerformanceTracker()
+                tracker.register_our_post({
+                    "post_id": result.post_id,
+                    "url": result.url,
+                    "keyword": keyword,
+                    "category": post.category,
+                    "title": post.title,
+                    "length": len(post.content),
+                    "heading_count": post.content.count("<h2") + post.content.count("<h3"),
+                    "image_count": post.content.count("<img"),
+                })
+                logger.info("Post registered for performance tracking")
+            except Exception as e:
+                logger.warning(f"Performance tracking failed: {e}")
 
             # 5. Google Indexing API 색인 요청
             try:
@@ -372,18 +393,18 @@ def run_pipeline(
 
             filtered_keywords = []
             for kw in keywords:
-                # WP 제목에서 중복 체크
-                is_dup = False
-                for title_text in recent_title_texts:
-                    if kw.lower() in title_text or title_text in kw.lower():
-                        logger.info(f"Skipping '{kw}' - similar to recent WP title")
-                        is_dup = True
-                        break
+                # 토큰 기반 중복 체크 (WP + DB)
+                is_dup, dup_info = check_duplicate(
+                    keyword=kw,
+                    wp_url=wp_publisher.site_url,
+                    wp_user=wp_publisher.username,
+                    wp_pass=wp_publisher.app_password,
+                    db=db,
+                    threshold=0.6,
+                    days=30
+                )
                 if is_dup:
-                    continue
-                # DB 유사 키워드 체크
-                if db.is_similar_keyword_published(kw, days=7):
-                    logger.info(f"Skipping '{kw}' - similar keyword in DB")
+                    logger.info(f"Skipping '{kw}' - duplicate: {dup_info.get('title', '')[:40]} (sim={dup_info['similarity']})")
                     continue
                 filtered_keywords.append(kw)
 
