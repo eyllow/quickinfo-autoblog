@@ -35,13 +35,45 @@ function quickinfo_remove_empty_featured_image($html, $post_id, $post_thumbnail_
 }
 add_filter('post_thumbnail_html', 'quickinfo_remove_empty_featured_image', 10, 5);
 
-// 다크 모드 비활성화
-function quickinfo_disable_dark_mode() {
+// 다크 모드 비활성화 + 레이아웃 오버라이드
+function quickinfo_head_styles() {
     echo '<style>
         html, body {
             color-scheme: light !important;
         }
+        /* Fix: qi-grid 사이드바 레이아웃 — 부모 테마 constrained 오버라이드 */
+        .qi-grid {
+            max-width: 1100px !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            display: grid !important;
+            grid-template-columns: 1fr 300px !important;
+            gap: 40px !important;
+        }
+        .qi-main-col {
+            max-width: none !important;
+            min-width: 0 !important;
+        }
+        .qi-side-col {
+            max-width: none !important;
+            min-width: 0 !important;
+            position: sticky !important;
+            top: 20px !important;
+        }
+        /* constrained 레이아웃이 qi-grid를 제한하지 못하게 */
+        .is-layout-constrained > .qi-grid,
+        .is-layout-constrained > .qi-container {
+            max-width: none !important;
+        }
+        @media (max-width: 768px) {
+            .qi-grid {
+                grid-template-columns: 1fr !important;
+            }
+            .qi-side-col {
+                position: static !important;
+            }
+        }
     </style>';
 }
-add_action('wp_head', 'quickinfo_disable_dark_mode');
+add_action('wp_head', 'quickinfo_head_styles');
 ?>

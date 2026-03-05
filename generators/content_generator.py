@@ -54,6 +54,41 @@ def clean_ai_response(content: str) -> str:
     return content
 
 
+def fix_html_tag_balance(html_content: str) -> str:
+    """
+    HTML 태그 밸런스 검증 및 자동 수정
+    닫히지 않은 <div>, <span>, <p>, <table> 등을 자동으로 닫아
+    WordPress 테마 레이아웃이 깨지는 것을 방지
+    
+    근본 원인: 콘텐츠에 닫히지 않은 태그가 있으면 single.php의
+    qi-single-body </div>가 그 안쪽 태그를 닫는 데 소비되어
+    사이드바가 본문 안으로 흡수됨
+    """
+    import re
+    
+    # 검사할 블록 태그들
+    block_tags = ['div', 'span', 'table', 'tbody', 'thead', 'tr', 'td', 'th', 'section', 'article']
+    
+    for tag in block_tags:
+        opens = len(re.findall(rf'<{tag}[\s>]', html_content, re.I))
+        closes = len(re.findall(rf'</{tag}>', html_content, re.I))
+        diff = opens - closes
+        
+        if diff > 0:
+            # 닫히지 않은 태그 → 끝에 닫는 태그 추가
+            html_content += f'</{tag}>' * diff
+            logger.warning(f"[HTML Balance] Fixed {diff} unclosed <{tag}> tag(s)")
+        elif diff < 0:
+            # 여는 태그보다 닫는 태그가 많음 → 여분 닫는 태그 제거 (뒤에서부터)
+            for _ in range(abs(diff)):
+                last_close = html_content.rfind(f'</{tag}>')
+                if last_close >= 0:
+                    html_content = html_content[:last_close] + html_content[last_close + len(f'</{tag}>'):]
+            logger.warning(f"[HTML Balance] Removed {abs(diff)} extra </{tag}> tag(s)")
+    
+    return html_content
+
+
 def clean_html_styles(html_content: str) -> str:
     """
     발행 전 불필요한 스타일 제거 (왼쪽 검은 라인 등)

@@ -18,7 +18,7 @@ from config.categories import (
     CATEGORY_IDS,
     CATEGORY_NAMES,
 )
-from generators.content_generator import clean_html_styles
+from generators.content_generator import clean_html_styles, fix_html_tag_balance
 
 logger = logging.getLogger(__name__)
 
@@ -350,6 +350,9 @@ class WordPressPublisher:
         try:
             # 발행 전 HTML 스타일 정리 (왼쪽 검은 라인 등 제거)
             content = clean_html_styles(content)
+
+            # HTML 태그 밸런스 검증 및 자동 수정
+            content = fix_html_tag_balance(content)
 
             # 카테고리 ID 결정 (category_id 우선, 없으면 categories에서 변환)
             category_ids = []
