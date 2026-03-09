@@ -30,6 +30,7 @@ from generators import ContentGenerator
 from publishers import WordPressPublisher
 from utils.quality_scorer import score_generated_content
 from utils.performance_learner import performance_learner, get_keyword_scores
+from utils.dedup_checker import check_duplicate
 
 # 로깅 설정
 logging.basicConfig(
@@ -250,7 +251,8 @@ def process_keyword(
                 logger.warning(f"DUPLICATE BLOCKED: '{keyword}' ~ '{dup_info.get('title', '')}' (sim={dup_info['similarity']})")
                 return False
         except Exception as e:
-            logger.warning(f"Dedup check failed: {e}")
+            logger.error(f"Dedup check failed, BLOCKING publish for safety: {e}")
+            return False
 
         # 3. 워드프레스에 발행
         logger.info(f"Step 3: Publishing to WordPress (status: {status})...")
